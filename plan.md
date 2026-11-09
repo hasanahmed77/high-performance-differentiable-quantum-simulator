@@ -198,13 +198,15 @@ closed at sprint review. Milestones suit goal-based sprints better than fixed-le
 **Custom fields:** `Sprint` (milestone), `Epic` (single-select E1–E12), `Priority` (P0 Must / P1 Should / P2 Could / P3 Won't-now),
 `Points` (number, Fibonacci 1-2-3-5-8), `Type` (feature, bug, test, docs, chore, spike, perf).
 
-**Views:**
-1. *Sprint board*: board layout, filtered to the open sprint milestone.
-2. *Product backlog*: table sorted by Priority, then ID.
-3. *Roadmap*: table grouped by Sprint milestone, then Epic.
-4. *Bugs*: table filtered to `Type = bug`.
+**View:** a single *Sprint Board* (board layout, columns by Status). The Product backlog and the Roadmap are
+read from the issue list and the milestones (each milestone groups one sprint's stories and shows its progress),
+so extra project views aren't needed. *(PO decision, 2026-11-09.)*
 
-**Automations:** new issues auto-added to Backlog; PR opened → In Review; PR merged → Verify; issue closed → Done.
+**Status transitions and WIP limits** are maintained by the development team through the GitHub API as part of
+the workflow, rather than by built-in project automations:
+- story started → 🔨 In Progress; PR opened → 👀 In Review; PR merged → 🧪 Verify; sprint review → 🚀 Done.
+- The WIP limits (In Progress ≤2, In Review ≤3) are checked before a story starts or a PR opens, and recorded in
+  the sprint report if they are exceeded.
 
 **Labels:** `epic:*`, `type:*`, `P0`–`P3`, `blocked`, `good first issue`, `help wanted`, `breaking-change`, `perf-regression`.
 
