@@ -6,7 +6,7 @@
 | | |
 |---|---|
 | **Repository** | `hasanahmed77/high-performance-differentiable-quantum-simulator` |
-| **Framework** | Scrum (2-week sprints) + Kanban board (GitHub Projects) |
+| **Framework** | Scrum with goal-based sprints + Kanban flow (GitHub Projects) |
 | **Product Owner / Architect** | Project owner: sets priorities, approves designs, reviews every PR, accepts or rejects sprint output |
 | **Development team** | Claude: implements, tests, documents, proposes designs as ADRs |
 | **Status** | Planning (Sprint 0 not yet started) |
@@ -49,7 +49,7 @@ kernels, and benchmarks that are published along with the cases where it loses.
 | G3 | Performance (CPU) | Faster than `default.qubit` on all suite benchmarks at ≥20 qubits; within 1.5× of `lightning.qubit` (published either way) |
 | G4 | Performance (GPU) | ≥70% of peak memory bandwidth on single-gate kernels (roofline-verified) |
 | G5 | Scale | 29 qubits (complex64) on the 8 GB development GPU; 30 qubits on a 16 GB T4 (free tier); 31 qubits sharded across 2× T4 (stretch) |
-| G6 | Distribution | `pip install <pkg>` works on Linux/macOS/Windows for Python 3.11–3.14, with prebuilt wheels |
+| G6 | Distribution | `pip install ketjet` works on Linux/macOS/Windows for Python 3.11–3.14, with prebuilt wheels |
 | G7 | Adoption | ≥1 external user or contributor; ≥1 upstream PR to the PennyLane ecosystem |
 
 ### Constraint: zero budget
@@ -110,7 +110,7 @@ is the map.
  ┌───────────────────────────────────────────────────────────────┐
  │  User-facing layer                                            │
  │   • Python API: Circuit, gates, observables, run()/expval()   │
- │   • PennyLane device adapter (qml.device("<pkg>.qubit"))      │
+ │   • PennyLane device adapter (qml.device("ketjet.qubit"))      │
  └───────────────┬───────────────────────────────────────────────┘
                  │  Circuit IR (immutable list of Operations)
  ┌───────────────▼───────────────────────────────────────────────┐
@@ -151,8 +151,23 @@ is the map.
 
 ### 4.2 Cadence
 
-- **Sprint length:** 2 weeks (calendar). With an AI dev team, the real constraint is review bandwidth. Velocity is calibrated after Sprints 0–2.
+- **Goal-based sprints (no fixed timebox).** The team works at maximum daily pace. A sprint is
+  scoped by its **sprint goal** and closes as soon as that goal is met and the sprint-level DoD (§5.3)
+  passes, not on a calendar date. Review and retro still close every sprint, so speed never bypasses
+  the quality gates.
+- **Scope is fixed once a sprint starts.** New work goes to the backlog, not into the running sprint.
+  If a sprint can't reach its goal, the PO either re-scopes it explicitly or ends it early and re-plans.
 - **Sprint 0** is a foundations sprint that delivers tooling, not features.
+
+**Flow metrics** (since there's no fixed timebox, these replace calendar velocity), recorded in each sprint report:
+
+| Metric | Definition | Use |
+|---|---|---|
+| Throughput | Points (and stories) completed per sprint | Forecasting the remaining roadmap |
+| Cycle time | In Progress → Done, per story | Spotting stories that are too big or get blocked |
+| Review wait | In Review → merged | Detecting a PO-review bottleneck |
+| Sprint duration | Planning → review, in days | Trend over time; forecast for the next releases |
+| Escaped defects | Bugs found after a story reached Done | Quality of the DoD |
 
 | Ceremony | When | Output |
 |---|---|---|
@@ -171,19 +186,22 @@ is the map.
 | Column | Entry rule | WIP limit |
 |---|---|---|
 | 📥 Backlog | Any issue | none |
-| ✅ Ready | Meets the Definition of Ready, selected for the current iteration | none |
+| ✅ Ready | Meets the Definition of Ready, selected for the current sprint | none |
 | 🔨 In Progress | Branch created, work started | **2** |
 | 👀 In Review | PR open, CI green, awaiting PO review | **3** |
 | 🧪 Verify | Merged; sprint-level integration/regression checks pending | none |
 | 🚀 Done | Meets the Definition of Done | none |
 
-**Custom fields:** `Iteration` (2-week), `Epic` (single-select E1–E12), `Priority` (P0 Must / P1 Should / P2 Could / P3 Won't-now),
+**Sprints as milestones:** each sprint is a GitHub **Milestone** (`Sprint 00 – Foundations`, …) with no due date,
+closed at sprint review. Milestones suit goal-based sprints better than fixed-length Iteration fields.
+
+**Custom fields:** `Sprint` (milestone), `Epic` (single-select E1–E12), `Priority` (P0 Must / P1 Should / P2 Could / P3 Won't-now),
 `Points` (number, Fibonacci 1-2-3-5-8), `Type` (feature, bug, test, docs, chore, spike, perf).
 
 **Views:**
-1. *Sprint board*: board layout, filtered to `@current` iteration.
+1. *Sprint board*: board layout, filtered to the open sprint milestone.
 2. *Product backlog*: table sorted by Priority, then ID.
-3. *Roadmap*: roadmap layout grouped by Epic across iterations.
+3. *Roadmap*: table grouped by Sprint milestone, then Epic.
 4. *Bugs*: table filtered to `Type = bug`.
 
 **Automations:** new issues auto-added to Backlog; PR opened → In Review; PR merged → Verify; issue closed → Done.
@@ -282,7 +300,7 @@ results from different machines are comparable.
 - [ ] Full test suite runs on `main`: unit, integration, property-based, regression, and the PennyLane device suite (once it exists)
 - [ ] Benchmark suite runs on `main` with no unexplained regression above 5%
 - [ ] Docs site builds without warnings and is deployed
-- [ ] Sprint report written to `docs/sprints/sprint-NN.md`: goal met?, stories done/carried, test results, coverage, benchmark deltas
+- [ ] Sprint report written to `docs/sprints/sprint-NN.md`: goal met?, stories done/carried, test results, coverage, benchmark deltas, flow metrics (§4.2)
 - [ ] Retrospective recorded
 
 ### 5.4 Definition of Done: release level
@@ -421,7 +439,7 @@ Tolerances live in one module (`tests/tolerances.py`) and are never loosened inl
 | ID | Story | Pri | Pts | Acceptance criteria |
 |---|---|---|---|---|
 | QS-501 | Spike: study PennyLane's `devices.Device` API, preprocessing and the test suite | P0 | 2 | Notes in `docs/adr/0004-pennylane-device.md` |
-| QS-502 | As a PennyLane user, I want `qml.device("<pkg>.qubit", wires=n)` via an entry point | P0 | 5 | Device registered through `pennylane.plugins`; QNodes execute |
+| QS-502 | As a PennyLane user, I want `qml.device("ketjet.qubit", wires=n)` via an entry point | P0 | 5 | Device registered through `pennylane.plugins`; QNodes execute |
 | QS-503 | As a PennyLane user, I want unsupported ops decomposed automatically | P0 | 3 | Preprocess transforms; unsupported ops give a clear error |
 | QS-504 | As a PennyLane user, I want `diff_method="adjoint"` and `"backprop"` to work | P0 | 5 | `compute_derivatives` / `compute_vjp` implemented; matches `default.qubit` |
 | QS-505 | As a maintainer, I want `pl-device-test` passing in CI | P0 | 3 | All applicable tests pass; skips documented |
@@ -476,7 +494,7 @@ Tolerances live in one module (`tests/tolerances.py`) and are never loosened inl
 | QS-903 | As a user, I want GPU expvals and sampling without copying the state to the host | P0 | 5 | Only scalars/samples cross PCIe (profiler-verified) |
 | QS-904 | As a researcher, I want GPU adjoint differentiation | P1 | 5 | Matches CPU adjoint |
 | QS-905 | As a user, I want complex64 and complex128 on GPU | P0 | 2 | Both pass with their tolerances |
-| QS-906 | As a user, I want an installable GPU package (separate CUDA wheel extra, e.g. `pip install <pkg>[cuda12]`) | P1 | 5 | Installs on a clean CUDA 12 machine |
+| QS-906 | As a user, I want an installable GPU package (separate CUDA wheel extra, e.g. `pip install ketjet[cuda12]`) | P1 | 5 | Installs on a clean CUDA 12 machine |
 | QS-907 | As a maintainer, I want a hardened self-hosted GPU CI runner on the workstation | P0 | 3 | Meets the §4.5 security model; `gpu.yml` never triggers on PRs; green run on `main` |
 | QS-908 | As the PO, I want a 30-qubit run on a free-tier T4 (Kaggle or Colab) to validate G5 | P1 | 2 | Versioned notebook installs the pinned lockfile; results and hardware recorded in the benchmark JSON; $0 cost |
 
@@ -633,7 +651,8 @@ docs deployed, a sprint report and a retro. Test focus lists the test types that
 **Test focus:** Release-level DoD (§5.4).
 **Release:** **v1.0.0**, plus the write-up, the upstream PR and outreach.
 
-**Total:** 17 sprints, about 8 months at 2 weeks each. Velocity measured in Sprints 0–2 may compress or stretch this, and the PO re-plans at each sprint review.
+**Total:** 17 goal-based sprints. There's no calendar estimate up front: after Sprint 2, the measured throughput
+and sprint durations (§4.2) are used to forecast the remaining releases, and the forecast is refreshed at every sprint review.
 
 ---
 
@@ -691,13 +710,15 @@ docs deployed, a sprint report and a retro. Test focus lists the test types that
 
 To be settled in Sprint 0 planning. The recommendation comes first in each case.
 
-| # | Decision | Options | Recommendation |
+All decisions were settled by the PO on 2026-11-09.
+
+| # | Decision | Outcome | Rationale |
 |---|---|---|---|
-| D1 | PyPI package name | Short and memorable (checked for availability) vs the repo name | A short name, e.g. `qsimx` style, since the repo name is too long to import |
-| D2 | Docs tool | MkDocs Material + mkdocstrings / Sphinx + Furo | **MkDocs Material**: faster to write, looks modern; Sphinx if we want to match PennyLane's docs exactly |
-| D3 | License | Apache-2.0 / MIT | **Apache-2.0**: same as PennyLane, includes a patent grant |
-| D4 | Supported Python | 3.11–3.14 / 3.10–3.14 | **3.11–3.14**, following SPEC 0 and what JAX supports |
-| D5 | GPU access | ✅ **Decided:** RTX 4060 workstation (WSL2) for development and GPU CI, plus free-tier Kaggle/Colab T4s for large-scale runs. Zero budget (§1, §4.5). | n/a |
-| D6 | Sprint length | 1 week / 2 weeks | **2 weeks**, re-evaluated after Sprint 2 |
-| D7 | Multi-GPU (E10) | Keep as stretch / drop | **Keep as stretch**: it's the most impressive piece, but it's last for a reason |
-| D8 | Build backend for the pure-Python phase | hatchling / setuptools | **hatchling** until Sprint 8, then **scikit-build-core** for the native build |
+| D1 | PyPI package name | ✅ **`ketjet`** (`import ketjet as kj`; device `ketjet.qubit`) | Unique and searchable; "ket" is quantum state notation and "jet" signals speed. Available on PyPI as of 2026-11-09, to be reserved in Sprint 0 (QS-111). |
+| D2 | Docs tool | ✅ **MkDocs Material + mkdocstrings** | Modern, Markdown-based, fast to iterate |
+| D3 | License | ✅ **Apache-2.0** | Matches PennyLane; includes a patent grant |
+| D4 | Supported Python | ✅ **3.11–3.14** | Follows SPEC 0 and JAX/NumPy support windows |
+| D5 | GPU access | ✅ **RTX 4060 workstation (WSL2) + free-tier Kaggle/Colab T4s** | Zero budget (§1, §4.5) |
+| D6 | Sprint length | ✅ **Goal-based sprints, not fixed-length** | Work proceeds at maximum daily pace; a sprint closes when its goal and DoD are met (§4.2) |
+| D7 | Multi-GPU (E10) | ✅ **Kept as stretch** | Most impressive piece; scheduled last so it cannot block anything |
+| D8 | Build backend | ✅ **hatchling**, then **scikit-build-core** from Sprint 8 | Simple for pure Python; scikit-build-core handles the C++/CUDA build |
