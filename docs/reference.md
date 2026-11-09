@@ -15,3 +15,11 @@ The reference is generated from the docstrings in the source code, so it always 
 ## Kernels
 
 ::: ketjet.kernels
+
+## Gates
+
+::: ketjet.gates
+
+## Operations
+
+::: ketjet.operations

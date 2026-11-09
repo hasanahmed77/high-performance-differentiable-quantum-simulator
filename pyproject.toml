@@ -41,6 +41,7 @@ test = [
     "pytest-cov>=7.0",
     "hypothesis>=6.140",
     "diff-cover>=9.0",
+    "pennylane>=0.44 ; python_full_version < '3.15'",
 ]
 lint = [
     "ruff>=0.17",
@@ -104,6 +105,8 @@ convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D", "PLR0913"]
+# Gate constructors are documented as nouns ("Controlled-X."), like the textbook gate names.
+"src/ketjet/operations.py" = ["D401"]
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
