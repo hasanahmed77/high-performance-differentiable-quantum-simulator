@@ -63,8 +63,12 @@ plugins:
             show_signature_annotations: true
 
 extra_javascript:
-  - javascripts/mathjax.js
-  - https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js
+  - javascripts/katex.js
+  - https://cdn.jsdelivr.net/npm/katex@0.19.1/dist/katex.min.js
+  - https://cdn.jsdelivr.net/npm/katex@0.19.1/dist/contrib/auto-render.min.js
+
+extra_css:
+  - https://cdn.jsdelivr.net/npm/katex@0.19.1/dist/katex.min.css
 
 markdown_extensions:
   - admonition
