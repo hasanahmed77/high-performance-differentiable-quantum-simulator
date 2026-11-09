@@ -706,6 +706,7 @@ and sprint durations (§4.2) are used to forecast the remaining releases, and th
 | Scope creep | High | Medium | Out-of-scope list in §1; new ideas go to the backlog at P3 and the PO decides |
 | PO review becomes the bottleneck | Medium | Medium | Small PRs (one story each); WIP limit 3 for In Review; a sprint report summarizes everything for review |
 | CUDA packaging complexity | Medium | High | Ship the CUDA backend as a separate extra/wheel; source build documented as fallback |
+| MkDocs core is unmaintained (no release since Aug 2024); Material for MkDocs's authors now point to their successor, Zensical (0.1.0, Nov 2026) | Low | Medium | Stay on Material (still maintained) for now; Zensical reads `mkdocs.yml`, so migration is low-cost. Re-evaluate at Sprint 15 hardening. |
 
 ---
 
