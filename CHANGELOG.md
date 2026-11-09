@@ -14,5 +14,7 @@ news fragments (one per PR).
 - Release pipeline: TestPyPI → smoke test → PyPI via Trusted Publishing.
 - `ketjet.zero_state(n, dtype, max_bytes=...)`: allocate the |0…0⟩ state in complex128 or complex64, with clear
   `MemoryError`s; `ketjet.state_nbytes` reports memory up front (QS-202).
+- `ketjet.kernels.apply_matrix(state, matrix, wires)`: apply any 2^k x 2^k matrix to k wires; pure, dtype-preserving,
+  validated against an independent dense reference (QS-203).
 
 [Unreleased]: https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator/commits/main

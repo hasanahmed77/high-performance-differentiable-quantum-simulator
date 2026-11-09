@@ -217,9 +217,11 @@ the workflow, rather than by built-in project automations:
 - **Branching:** trunk-based. `main` is protected, and work happens on short-lived branches named `<type>/QS-<id>-<slug>` (e.g. `feat/QS-021-apply-gate`).
 - **Commits:** Conventional Commits (`feat:`, `fix:`, `perf:`, `test:`, `docs:`, `chore:`, `refactor:`).
 - **PRs:** one story per PR, linked to the issue (`Closes #N`), with CI green. Squash merge.
-- **Approval of record:** GitHub doesn't let a PR author approve their own PR, and all commits are pushed from the PO's
-  account. Branch protection therefore requires a PR and green status checks (0 required approvals), and the **PO's
-  review and merge is the approval**. No one else can merge to `main`.
+- **Merge policy (PO decision, 2026-11-10):** the development team merges a PR **once every required check is green**.
+  GitHub doesn't let a PR author approve their own PR (all commits come from the PO's account), so branch protection
+  requires a PR and green status checks (0 required approvals). The PO reviews the increment at **sprint review**,
+  can comment on or request changes to any PR at any time, and **ADRs still need explicit PO approval before
+  implementation**.
 - **Versioning:** SemVer. Pre-1.0 minors may break the API, and every break is listed in the changelog.
 - **Changelog:** Keep-a-Changelog format, generated from towncrier news fragments, one per PR.
 - **Design changes:** any change to a public API, the backend protocol, or the IR needs an ADR approved by the PO *before* implementation.
