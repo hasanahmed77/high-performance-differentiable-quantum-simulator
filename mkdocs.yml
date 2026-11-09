@@ -1,0 +1,79 @@
+site_name: ketjet
+site_description: A high-performance differentiable quantum statevector simulator, usable as a PennyLane device.
+site_url: https://hasanahmed77.github.io/high-performance-differentiable-quantum-simulator/
+repo_url: https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator
+repo_name: ketjet
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2026 Mustakim Ahmed Hasan. Licensed under Apache-2.0.
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: cyan
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: cyan
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - API reference: reference.md
+  - Development: development.md
+
+# Process records (ADRs, sprint reports) are kept in docs/ but published from Sprint 1 onward.
+not_in_nav: |
+  /adr/**
+  /sprints/**
+exclude_docs: |
+  /adr/0000-template.md
+  /sprints/template.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: numpy
+            show_source: false
+            show_root_heading: true
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.arithmatex:
+      generic: true
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
