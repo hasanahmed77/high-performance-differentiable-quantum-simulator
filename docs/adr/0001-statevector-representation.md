@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Proposed |
+| **Status** | Accepted (approved by the PO on 2026-11-10 in #104) |
 | **Date** | 2026-11-09 |
 | **Deciders** | Product Owner / Architect |
 | **Related stories** | QS-201, QS-202, QS-203, QS-209 |

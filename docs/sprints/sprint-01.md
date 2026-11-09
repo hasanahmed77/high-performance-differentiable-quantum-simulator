@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Planned (awaiting ADR approval) |
+| **Status** | In progress (ADRs accepted 2026-11-10) |
 | **Started** | 2026-11-09 |
 | **Milestone** | `Sprint 01 – The engine` |
 | **Sprint goal** | Apply any supported gate to any qubits of an n-qubit state, in either precision, with correctness proven against independent references. |

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Proposed |
+| **Status** | Accepted (approved by the PO on 2026-11-10 in #104) |
 | **Date** | 2026-11-09 |
 | **Deciders** | Product Owner / Architect |
 | **Related stories** | QS-301, QS-204, QS-209, later QS-302/303 (API), QS-402/404 (gradients), QS-802–805 (fusion) |
