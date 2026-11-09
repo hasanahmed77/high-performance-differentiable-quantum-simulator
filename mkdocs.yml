@@ -36,12 +36,14 @@ nav:
   - Home: index.md
   - Getting started: getting-started.md
   - API reference: reference.md
+  - Design decisions:
+      - "ADR-0001: Statevector representation": adr/0001-statevector-representation.md
+      - "ADR-0002: Circuit IR": adr/0002-circuit-ir.md
+  - Sprint reports:
+      - "Sprint 00: Foundations": sprints/sprint-00.md
+      - "Sprint 01: The engine": sprints/sprint-01.md
   - Development: development.md
 
-# Process records (ADRs, sprint reports) are kept in docs/ but published from Sprint 1 onward.
-not_in_nav: |
-  /adr/**
-  /sprints/**
 exclude_docs: |
   /adr/0000-template.md
   /sprints/template.md
@@ -59,6 +61,14 @@ plugins:
             members_order: source
             separate_signature: true
             show_signature_annotations: true
+
+extra_javascript:
+  - javascripts/katex.js
+  - https://cdn.jsdelivr.net/npm/katex@0.19.1/dist/katex.min.js
+  - https://cdn.jsdelivr.net/npm/katex@0.19.1/dist/contrib/auto-render.min.js
+
+extra_css:
+  - https://cdn.jsdelivr.net/npm/katex@0.19.1/dist/katex.min.css
 
 markdown_extensions:
   - admonition
