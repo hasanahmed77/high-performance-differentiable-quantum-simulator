@@ -20,5 +20,7 @@ news fragments (one per PR).
   their matrices; `ketjet.operations` with immutable, self-validating `Operation`s, symbolic `Parameter`s, controlled
   gates as structure (`CNOT`, `CZ`, `CRX`, `Toffoli`, `CSWAP`, `MultiControlledX`, `ctrl`), and inverses. Every matrix
   matches PennyLane.
+- `ketjet.backends`: typed `Backend` protocol with the consumed-input ownership rule (ADR-0001 D4) and the pure
+  `NumPyBackend` reference implementation; random circuits match PennyLane's `default.qubit` (QS-209).
 
 [Unreleased]: https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator/commits/main
