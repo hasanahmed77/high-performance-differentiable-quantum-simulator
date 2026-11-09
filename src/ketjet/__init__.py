@@ -1,9 +1,10 @@
 """ketjet: a high-performance differentiable quantum statevector simulator.
 
-The package is in its foundations phase (Sprint 0). The public API is introduced from Sprint 1
-onward; see ``plan.md`` in the repository for the roadmap.
+The public API grows sprint by sprint; see ``plan.md`` in the repository for the roadmap.
 """
+
+from ketjet.statevector import MAX_QUBITS, state_nbytes, zero_state
 
 __version__ = "0.0.0"
 
-__all__ = ["__version__"]
+__all__ = ["MAX_QUBITS", "__version__", "state_nbytes", "zero_state"]

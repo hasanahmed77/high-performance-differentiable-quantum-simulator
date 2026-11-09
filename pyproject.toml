@@ -74,6 +74,8 @@ packages = ["src/ketjet"]
 line-length = 100
 target-version = "py312"
 src = ["src", "tests"]
+# Docs are prose: ruff must not rewrite code examples inside Markdown (e.g. accepted ADRs).
+extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = [
@@ -121,15 +123,18 @@ follow_untyped_imports = true
 # --------------------------------------------------------------------------- pytest
 [tool.pytest.ini_options]
 minversion = "9.0"
-testpaths = ["tests"]
+testpaths = ["src", "tests"]
+pythonpath = ["."]
 addopts = [
     "-ra",
     "--strict-markers",
     "--strict-config",
     "--import-mode=importlib",
+    "--doctest-modules",
     "-m", "not slow and not gpu and not nightly",
 ]
 xfail_strict = true
+doctest_optionflags = ["NORMALIZE_WHITESPACE", "NUMBER"]
 filterwarnings = ["error"]
 markers = [
     "slow: long-running tests (excluded from default PR runs)",

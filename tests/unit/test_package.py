@@ -24,3 +24,9 @@ def test_package_is_typed() -> None:
 
 def test_public_api_is_explicit() -> None:
     assert "__version__" in ketjet.__all__
+
+
+def test_statevector_api_is_exported_at_top_level() -> None:
+    assert ketjet.zero_state(1).shape == (2,)
+    assert ketjet.state_nbytes(1) == 32
+    assert ketjet.MAX_QUBITS == 63
