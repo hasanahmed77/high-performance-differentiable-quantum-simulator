@@ -9,13 +9,8 @@ news fragments (one per PR).
 
 ## [Unreleased]
 
-## [0.0.0] - 2026-11-09
-
-Name reservation release. This version contains no simulator functionality.
-
 ### Added
 - Package skeleton (`ketjet`), typed (PEP 561), Apache-2.0 licensed.
 - Release pipeline: TestPyPI → smoke test → PyPI via Trusted Publishing.
 
-[Unreleased]: https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator/compare/v0.0.0...HEAD
-[0.0.0]: https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator/releases/tag/v0.0.0
+[Unreleased]: https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator/commits/main
