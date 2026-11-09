@@ -64,7 +64,7 @@ default-groups = ["dev"]
 path = "src/ketjet/__init__.py"
 
 [tool.hatch.build.targets.sdist]
-include = ["src/ketjet", "tests", "README.md", "LICENSE", "pyproject.toml"]
+include = ["src/ketjet", "tests", "README.md", "LICENSE", "CHANGELOG.md", "pyproject.toml"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ketjet"]

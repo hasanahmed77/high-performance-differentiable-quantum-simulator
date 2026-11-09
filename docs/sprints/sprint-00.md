@@ -19,7 +19,7 @@
 | QS-106 | Branch protection + PR template | 1 | PR: process templates + repo settings |
 | QS-107 | CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, LICENSE | 2 | PR: governance |
 | QS-109 | ADR and sprint-report templates | 1 | PR: process templates |
-| QS-111 | Reserve the `ketjet` name on PyPI | 1 | PR: release bootstrap (needs PO action, see below) |
+| QS-111 | Prepare the `ketjet` PyPI release (publishers + pipeline) | 1 | PR: release pipeline (needs PO action, see below) |
 | QS-1201 | Docs site skeleton (MkDocs Material) | 2 of 5 | PR: docs skeleton |
 | QS-1203 | README skeleton | 1 of 2 | PR: docs skeleton |
 | | **Total** | **19** | |
@@ -41,7 +41,7 @@ and none of the four is testable on its own. Every later PR follows the one-stor
 | QS-106 | A direct push to `main` is rejected; a PR with red CI can't be merged |
 | QS-107 | Files present; license text is Apache-2.0; GitHub detects the license |
 | QS-109 | Templates render on GitHub; the issue forms validate |
-| QS-111 | `ketjet` 0.0.0 appears on PyPI, published from CI via Trusted Publishing |
+| QS-111 | Pending trusted publishers registered on PyPI and TestPyPI; `release.yml` merged and lint-clean; release logic tested locally. End-to-end run happens with the first functional release. |
 | QS-1201 | `mkdocs build --strict` passes in CI; site deployed to GitHub Pages |
 | QS-1203 | README renders with project summary, status and badges |
 
@@ -50,7 +50,8 @@ and none of the four is testable on its own. Every later PR follows the one-stor
 1. **PyPI (QS-111).** Create accounts on pypi.org and test.pypi.org (with 2FA), then add a *pending trusted publisher*:
    - project name `ketjet`, owner `hasanahmed77`, repository `high-performance-differentiable-quantum-simulator`,
      workflow `release.yml`, environment `pypi` (and `testpypi` on TestPyPI).
-   - A pending publisher does **not** reserve the name. The name is reserved when CI publishes the 0.0.0 placeholder.
+   - A pending publisher does **not** reserve the name. We deliberately **don't** upload an empty placeholder:
+     PEP 541 classes a package with no functionality as name squatting. The name is claimed by the first functional release.
 2. **Board views and automations (QS-105).** GitHub's API can't create Project views, column limits or built-in workflows,
    so these are a short manual checklist (given at the end of this sprint's board setup).
 3. **Review and merge** each Sprint 0 PR.
@@ -66,6 +67,9 @@ and none of the four is testable on its own. Every later PR follows the one-stor
   Approved by the PO during planning.
 - **Tooling.** `uv` manages Python versions, the virtual environment and the lockfile (`uv.lock`), which is the
   pinned lockfile referenced in §4.5.
+
+- **No placeholder upload (PEP 541).** Publishing an empty 0.0.0 to reserve the name would be name squatting under
+  PEP 541. QS-111 is re-scoped to "publishers + pipeline ready"; the first PyPI upload carries real functionality.
 
 ## Sprint review
 

@@ -395,7 +395,7 @@ Tolerances live in one module (`tests/tolerances.py`) and are never loosened inl
 | QS-108 | As a maintainer, I want towncrier changelog fragments enforced in CI, so the changelog is never forgotten | P1 | 2 | PR without a fragment fails unless labelled `skip-changelog` |
 | QS-109 | As the PO, I want ADR and sprint-report templates, so decisions and progress are recorded | P0 | 1 | `docs/adr/0000-template.md`, `docs/sprints/template.md` |
 | QS-110 | As a maintainer, I want Dependabot, CodeQL and pip-audit, so dependencies stay safe | P1 | 2 | Workflows active, no high-severity alerts |
-| QS-111 | Spike: reserve the PyPI package name and choose it (decision D1) | P0 | 1 | Name reserved via an initial TestPyPI/PyPI placeholder release |
+| QS-111 | Spike: choose the PyPI package name and prepare its first release (decision D1) | P0 | 1 | Name chosen; trusted publishers registered on PyPI and TestPyPI; release pipeline merged; **no empty placeholder upload**, since PEP 541 treats a package with no functionality as name squatting. The first PyPI upload is the first release with real functionality. |
 | QS-112 | As a maintainer, I want a reproducible GPU workstation environment (WSL2 Ubuntu, CUDA 12, pinned Docker image, setup guide) | P0 | 3 | `nvidia-smi` and `jax.devices()` show the RTX 4060 inside the container; guide in `docs/dev/gpu-workstation.md` |
 
 ### E2: Core simulation engine (NumPy reference backend)
@@ -694,6 +694,7 @@ and sprint durations (§4.2) are used to forecast the remaining releases, and th
 | Risk | Impact | Likelihood | Mitigation |
 |---|---|---|---|
 | Development GPU has 8 GB, which limits single-GPU scale | Medium | Certain | 8 GB covers all development and roofline work (§4.5); 30-qubit and 2-GPU results come from free-tier T4 sessions using the pinned lockfile |
+| `ketjet` name taken before our first real release | Low | Low | Obscure, distinctive name; pending trusted publishers registered; first real release published as early as policy allows (no placeholder uploads, per PEP 541) |
 | Free GPU tiers change their quotas or availability | Low | Medium | Free-tier results are nice-to-have, never release-blocking; Colab is the fallback for Kaggle; the 4060 covers everything else |
 | Zero budget limits multi-GPU to 2 devices | Low | Certain | 1 → 2 GPU measurements prove the distributed design and its communication cost; larger scaling is analysed with emulated devices and labelled as such |
 | GPU work is split across two machines (Mac + workstation) | Medium | Medium | Pinned container image; GPU code behind the backend protocol so CPU work is never blocked; all state lives in git, so switching machines is a `git pull` |
