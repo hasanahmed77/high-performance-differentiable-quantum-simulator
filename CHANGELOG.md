@@ -16,5 +16,9 @@ news fragments (one per PR).
   `MemoryError`s; `ketjet.state_nbytes` reports memory up front (QS-202).
 - `ketjet.kernels.apply_matrix(state, matrix, wires)`: apply any 2^k x 2^k matrix to k wires; pure, dtype-preserving,
   validated against an independent dense reference (QS-203).
+- Gate library (QS-204, ADR-0002): `ketjet.gates` registry of 20 base gates with structure flags verified against
+  their matrices; `ketjet.operations` with immutable, self-validating `Operation`s, symbolic `Parameter`s, controlled
+  gates as structure (`CNOT`, `CZ`, `CRX`, `Toffoli`, `CSWAP`, `MultiControlledX`, `ctrl`), and inverses. Every matrix
+  matches PennyLane.
 
 [Unreleased]: https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator/commits/main
