@@ -1,0 +1,64 @@
+name: User story
+description: A feature or technical task for the product backlog
+title: "QS-XXX: "
+labels: ["type:feature"]
+body:
+  - type: textarea
+    id: story
+    attributes:
+      label: Story
+      description: "As a <role>, I want <capability>, so that <benefit>."
+      placeholder: As a researcher, I want ..., so that ...
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Testable criteria, as a checklist or Given/When/Then.
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: checkboxes
+    id: tests
+    attributes:
+      label: Test plan
+      description: Which test types will verify this story? (Definition of Ready, plan.md §5.1)
+      options:
+        - label: Unit
+        - label: Integration
+        - label: Property-based / differential
+        - label: Regression
+        - label: Performance
+  - type: dropdown
+    id: epic
+    attributes:
+      label: Epic
+      options:
+        - E1 Foundation
+        - E2 Engine
+        - E3 Circuit & measurements
+        - E4 Differentiation
+        - E5 PennyLane
+        - E6 JAX
+        - E7 Native C++
+        - E8 Fusion
+        - E9 CUDA
+        - E10 Multi-GPU
+        - E11 Benchmarks
+        - E12 Docs & release
+    validations:
+      required: true
+  - type: dropdown
+    id: points
+    attributes:
+      label: Estimate (story points)
+      description: Stories above 8 points must be split before entering a sprint.
+      options: ["1", "2", "3", "5", "8"]
+  - type: checkboxes
+    id: adr
+    attributes:
+      label: Design
+      options:
+        - label: This touches a public API, the backend protocol or the IR, so it needs an ADR first
