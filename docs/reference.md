@@ -23,3 +23,9 @@ The reference is generated from the docstrings in the source code, so it always 
 ## Operations
 
 ::: ketjet.operations
+
+## Backends
+
+::: ketjet.backends.base
+
+::: ketjet.backends.numpy_backend
