@@ -1,0 +1,155 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ketjet"
+dynamic = ["version"]
+description = "A high-performance differentiable quantum statevector simulator, usable as a PennyLane device."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+authors = [{ name = "Mustakim Ahmed Hasan" }]
+keywords = ["quantum", "simulator", "statevector", "autodiff", "jax", "pennylane", "gpu"]
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Intended Audience :: Science/Research",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Typing :: Typed",
+]
+dependencies = ["numpy>=2.1"]
+
+[project.urls]
+Homepage = "https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator"
+Documentation = "https://hasanahmed77.github.io/high-performance-differentiable-quantum-simulator/"
+Issues = "https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator/issues"
+Changelog = "https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator/blob/main/CHANGELOG.md"
+
+[dependency-groups]
+test = [
+    "pytest>=9.0",
+    "pytest-cov>=7.0",
+    "hypothesis>=6.140",
+    "diff-cover>=9.0",
+]
+lint = [
+    "ruff>=0.17",
+    "mypy>=2.0",
+    "pre-commit>=4.0",
+]
+dev = [
+    { include-group = "test" },
+    { include-group = "lint" },
+]
+
+[tool.uv]
+default-groups = ["dev"]
+
+# --------------------------------------------------------------------------- build
+[tool.hatch.version]
+path = "src/ketjet/__init__.py"
+
+[tool.hatch.build.targets.sdist]
+include = ["src/ketjet", "tests", "README.md", "LICENSE", "pyproject.toml"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ketjet"]
+
+# --------------------------------------------------------------------------- ruff
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # isort
+    "B",        # bugbear
+    "UP",       # pyupgrade
+    "SIM",      # simplify
+    "C4",       # comprehensions
+    "N",        # naming
+    "D",        # docstrings (public API must be documented)
+    "PT",       # pytest style
+    "NPY",      # numpy-specific
+    "PERF",     # performance anti-patterns
+    "RUF",      # ruff-specific
+    "TID",      # tidy imports
+    "PL",       # pylint subset
+]
+ignore = [
+    "PLR2004",  # magic values are normal in numerical tests and gate definitions
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D", "PLR0913"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+# --------------------------------------------------------------------------- mypy
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src", "tests"]
+warn_unreachable = true
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+
+[[tool.mypy.overrides]]
+module = ["hypothesis.*"]
+follow_untyped_imports = true
+
+# --------------------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--import-mode=importlib",
+    "-m", "not slow and not gpu and not nightly",
+]
+xfail_strict = true
+filterwarnings = ["error"]
+markers = [
+    "slow: long-running tests (excluded from default PR runs)",
+    "gpu: requires an NVIDIA GPU",
+    "native: requires the compiled native extension",
+    "pennylane: requires PennyLane",
+    "nightly: deep runs executed only by the nightly workflow",
+]
+
+# --------------------------------------------------------------------------- coverage
+[tool.coverage.run]
+branch = true
+source = ["ketjet"]
+
+[tool.coverage.paths]
+source = ["src/ketjet", "*/site-packages/ketjet"]
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+skip_covered = false
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@overload",
+    "\\.\\.\\.$",
+]

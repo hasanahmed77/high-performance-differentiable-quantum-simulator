@@ -49,7 +49,7 @@ kernels, and benchmarks that are published along with the cases where it loses.
 | G3 | Performance (CPU) | Faster than `default.qubit` on all suite benchmarks at ≥20 qubits; within 1.5× of `lightning.qubit` (published either way) |
 | G4 | Performance (GPU) | ≥70% of peak memory bandwidth on single-gate kernels (roofline-verified) |
 | G5 | Scale | 29 qubits (complex64) on the 8 GB development GPU; 30 qubits on a 16 GB T4 (free tier); 31 qubits sharded across 2× T4 (stretch) |
-| G6 | Distribution | `pip install ketjet` works on Linux/macOS/Windows for Python 3.11–3.14, with prebuilt wheels |
+| G6 | Distribution | `pip install ketjet` works on Linux/macOS/Windows for Python 3.12–3.15, with prebuilt wheels |
 | G7 | Adoption | ≥1 external user or contributor; ≥1 upstream PR to the PennyLane ecosystem |
 
 ### Constraint: zero budget
@@ -62,7 +62,7 @@ subscriptions. Every tool and service below is free for public open-source repos
 | CPU CI (Linux, macOS, Windows) | GitHub Actions standard runners (free and unlimited for public repos) |
 | GPU development and GPU CI | Owned RTX 4060 workstation (self-hosted runner) |
 | Large-scale GPU runs | Kaggle Notebooks (2× T4, 16 GB each, weekly free quota) and Google Colab free tier (1× T4) |
-| Coverage reporting | Codecov (free for open source) |
+| Coverage gate and reporting | pytest-cov + diff-cover inside CI (no account); Codecov optional for badges |
 | Docs and benchmark dashboard hosting | GitHub Pages |
 | Package distribution | PyPI / TestPyPI |
 | Security scanning | Dependabot, CodeQL, pip-audit |
@@ -214,7 +214,10 @@ closed at sprint review. Milestones suit goal-based sprints better than fixed-le
 
 - **Branching:** trunk-based. `main` is protected, and work happens on short-lived branches named `<type>/QS-<id>-<slug>` (e.g. `feat/QS-021-apply-gate`).
 - **Commits:** Conventional Commits (`feat:`, `fix:`, `perf:`, `test:`, `docs:`, `chore:`, `refactor:`).
-- **PRs:** one story per PR, linked to the issue (`Closes #N`), with CI green and PO approval required. Squash merge.
+- **PRs:** one story per PR, linked to the issue (`Closes #N`), with CI green. Squash merge.
+- **Approval of record:** GitHub doesn't let a PR author approve their own PR, and all commits are pushed from the PO's
+  account. Branch protection therefore requires a PR and green status checks (0 required approvals), and the **PO's
+  review and merge is the approval**. No one else can merge to `main`.
 - **Versioning:** SemVer. Pre-1.0 minors may break the API, and every break is listed in the changelog.
 - **Changelog:** Keep-a-Changelog format, generated from towncrier news fragments, one per PR.
 - **Design changes:** any change to a public API, the backend protocol, or the IR needs an ADR approved by the PO *before* implementation.
@@ -223,7 +226,7 @@ closed at sprint review. Milestones suit goal-based sprints better than fixed-le
 
 | Environment | Hardware | OS / toolchain | Role |
 |---|---|---|---|
-| **Primary dev** | MacBook Air M2 (ARM64, Apple GPU not used) | macOS, Python 3.11–3.14, Clang | Day-to-day development of all CPU work; NEON SIMD path; macOS arm64 wheel validation |
+| **Primary dev** | MacBook Air M2 (ARM64, Apple GPU not used) | macOS, Python 3.12–3.15, Clang | Day-to-day development of all CPU work; NEON SIMD path; macOS arm64 wheel validation |
 | **GPU workstation** | Desktop PC, NVIDIA RTX 4060 (8 GB, Ada, compute capability 8.9), x86-64 | Windows 11 + **WSL2 Ubuntu 24.04**, CUDA 12.x toolkit, `jax[cuda12]`, GCC/Clang, Nsight Compute | JAX-GPU and CUDA development, GPU benchmarks and roofline, x86 AVX2 validation, native Windows wheel testing |
 | **Hosted CI** | GitHub-hosted runners | Ubuntu, macOS, Windows | Full CPU matrix on every PR (§6.4) |
 | **Free GPU tier** | Kaggle Notebooks: 2× NVIDIA T4 (16 GB each); Google Colab free: 1× T4 (backup) | Hosted Linux notebooks; dependencies installed from the pinned lockfile | Large-scale runs only: 30-qubit single-GPU target (G5) and real 1 → 2 GPU scaling (E10). Planned, time-boxed sessions within the free weekly quota. |
@@ -363,7 +366,7 @@ Tolerances live in one module (`tests/tolerances.py`) and are never loosened inl
 
 | Workflow | Trigger | Jobs |
 |---|---|---|
-| `ci.yml` | PR, push to main | lint (ruff), types (mypy), tests on {ubuntu, macos, windows} × {3.11, 3.12, 3.13, 3.14}, coverage gate (Codecov), docs build |
+| `ci.yml` | PR, push to main | lint (ruff), types (mypy), tests on {ubuntu, macos, windows} × {3.12, 3.13, 3.14, 3.15}, coverage gates (pytest-cov project ≥85%, diff-cover patch ≥90%), build + wheel smoke test, docs build |
 | `native.yml` | PR touching `native/` | CMake build, C++ tests, sanitizers, wheel build test |
 | `nightly.yml` | cron, daily | deep Hypothesis, 10k differential circuits, asv benchmarks, memory tests, packaging smoke |
 | `gpu.yml` | manual, weekly, push to `main` (never PRs) | JAX-GPU + CUDA tests and GPU benchmarks on the self-hosted RTX 4060 runner (§4.5) |
@@ -385,9 +388,9 @@ Tolerances live in one module (`tests/tolerances.py`) and are never loosened inl
 | QS-101 | As a maintainer, I want a `src/` layout package with `pyproject.toml` (hatchling), so it builds and installs cleanly | P0 | 2 | `pip install -e .[dev]` works; `python -m build` produces sdist + wheel |
 | QS-102 | As a maintainer, I want ruff + mypy `--strict` + pre-commit hooks, so style and types never drift | P0 | 2 | Pre-commit runs ruff, ruff-format, mypy; config in `pyproject.toml` |
 | QS-103 | As a maintainer, I want a CI matrix across 3 OSes × 4 Python versions, so the code works everywhere | P0 | 3 | `ci.yml` green on 12 cells; required status checks on `main` |
-| QS-104 | As a maintainer, I want a coverage gate at 85%, so tests stay meaningful | P0 | 1 | Codecov project threshold 85%, patch 90%; PR fails below |
+| QS-104 | As a maintainer, I want a coverage gate at 85%, so tests stay meaningful | P0 | 1 | `pytest --cov-fail-under=85` (project) and `diff-cover --fail-under=90` (patch) in CI; PR fails below |
 | QS-105 | As the PO, I want the GitHub Projects board, fields, views, labels and templates set up, so the process is visible | P0 | 3 | Everything in §4.3 exists; backlog imported as issues |
-| QS-106 | As a maintainer, I want branch protection and a PR template, so every change is reviewed | P0 | 1 | Protected `main`, 1 approval, linear history, PR checklist includes the DoD |
+| QS-106 | As a maintainer, I want branch protection and a PR template, so every change is reviewed | P0 | 1 | Protected `main`: PR required, required status checks, linear history, no force-push; PO merge is the approval (§4.4); PR checklist includes the DoD |
 | QS-107 | As a contributor, I want CONTRIBUTING, CODE_OF_CONDUCT, SECURITY and LICENSE files, so I know how to participate | P0 | 2 | Files present; license per decision D3 |
 | QS-108 | As a maintainer, I want towncrier changelog fragments enforced in CI, so the changelog is never forgotten | P1 | 2 | PR without a fragment fails unless labelled `skip-changelog` |
 | QS-109 | As the PO, I want ADR and sprint-report templates, so decisions and progress are recorded | P0 | 1 | `docs/adr/0000-template.md`, `docs/sprints/template.md` |
@@ -677,7 +680,7 @@ and sprint durations (§4.2) are used to forecast the remaining releases, and th
 | QB2 PyPI + changelog | QS-111, 108, 1205 | Sprint 4 | Automated release pipeline |
 | QB3 Types + lint in CI | QS-102, 103 | Sprint 0 | Required CI check |
 | QB4 CI matrix | QS-103, 709 | Sprint 0 | Required CI check |
-| QB5 85% coverage + regression tests | QS-104, story DoD | Sprint 0 | Codecov gate; regression test required per bug fix |
+| QB5 85% coverage + regression tests | QS-104, story DoD | Sprint 0 | CI coverage gates; regression test required per bug fix |
 | QB6 Docs site | QS-1201, 1202 | Sprint 4 (complete by 15) | `docs.yml` + strict build |
 | QB7 Benchmarks + plots | QS-1101–1107 | Sprint 7 | Nightly asv; plots regenerated per release |
 | QB8 Design doc | QS-1204 + ADRs | Sprint 11 (final in 15) | ADR required for architectural changes |
@@ -717,7 +720,7 @@ All decisions were settled by the PO on 2026-11-09.
 | D1 | PyPI package name | ✅ **`ketjet`** (`import ketjet as kj`; device `ketjet.qubit`) | Unique and searchable; "ket" is quantum state notation and "jet" signals speed. Available on PyPI as of 2026-11-09, to be reserved in Sprint 0 (QS-111). |
 | D2 | Docs tool | ✅ **MkDocs Material + mkdocstrings** | Modern, Markdown-based, fast to iterate |
 | D3 | License | ✅ **Apache-2.0** | Matches PennyLane; includes a patent grant |
-| D4 | Supported Python | ✅ **3.11–3.14** | Follows SPEC 0 and JAX/NumPy support windows |
+| D4 | Supported Python | ✅ **3.12–3.15** (revised 2026-11-09 in Sprint 0) | NumPy ≥2.5 and JAX ≥0.12 require Python ≥3.12; follows SPEC 0. PennyLane-dependent tests are skipped on 3.15 until PennyLane supports it. |
 | D5 | GPU access | ✅ **RTX 4060 workstation (WSL2) + free-tier Kaggle/Colab T4s** | Zero budget (§1, §4.5) |
 | D6 | Sprint length | ✅ **Goal-based sprints, not fixed-length** | Work proceeds at maximum daily pace; a sprint closes when its goal and DoD are met (§4.2) |
 | D7 | Multi-GPU (E10) | ✅ **Kept as stretch** | Most impressive piece; scheduled last so it cannot block anything |
