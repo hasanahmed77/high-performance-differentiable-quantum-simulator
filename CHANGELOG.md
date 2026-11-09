@@ -12,5 +12,7 @@ news fragments (one per PR).
 ### Added
 - Package skeleton (`ketjet`), typed (PEP 561), Apache-2.0 licensed.
 - Release pipeline: TestPyPI → smoke test → PyPI via Trusted Publishing.
+- `ketjet.zero_state(n, dtype, max_bytes=...)`: allocate the |0…0⟩ state in complex128 or complex64, with clear
+  `MemoryError`s; `ketjet.state_nbytes` reports memory up front (QS-202).
 
 [Unreleased]: https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator/commits/main
