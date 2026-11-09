@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In progress |
+| **Status** | In review (awaiting PO acceptance) |
 | **Started** | 2026-11-09 |
 | **Milestone** | `Sprint 00 – Foundations` |
 | **Sprint goal** | An empty but production-grade repository in which every automated quality gate (QB3, QB4, QB5) is already enforced, and the delivery process (board, templates, protection) is in place. |
@@ -73,8 +73,61 @@ and none of the four is testable on its own. Every later PR follows the one-stor
 
 ## Sprint review
 
-*(Completed at sprint close: goal met?, stories done/carried, test results, flow metrics.)*
+**Goal met?** **Yes, with one manual item outstanding.** Every automated quality gate (QB3 types and lint, QB4 the
+CI matrix, QB5 coverage) is enforced on a protected `main`, and the delivery process is live. The only open work is
+QS-105's board views and column limits, which GitHub's API can't create.
+
+| ID | Outcome |
+|---|---|
+| QS-101 | ✅ Done (#96): `src/` layout, hatchling, `py.typed`, `uv.lock` |
+| QS-102 | ✅ Done (#96): ruff + `mypy --strict` + pre-commit |
+| QS-103 | ✅ Done (#96): 3 OSes × Python 3.12–3.15, all 12 cells green |
+| QS-104 | ✅ Done (#96): project ≥85% and patch ≥90% gates; verified that a drop to 27% fails |
+| QS-105 | ⏳ Board, fields, labels, milestones and 95 issues done; **views and column limits pending (PO, manual)** |
+| QS-106 | ✅ Done (#98 + repo settings): direct push to `main` verified rejected (`GH006`) |
+| QS-107 | ✅ Done (#97) |
+| QS-109 | ✅ Done (#98) |
+| QS-111 | ✅ Done, re-scoped (#101): publishers registered, pipeline merged; no placeholder upload (PEP 541) |
+| QS-1201 | ✅ Sprint 0 portion (#100): site live; remainder in Sprint 15 |
+| QS-1203 | ✅ Sprint 0 portion (#100): README skeleton; remainder in Sprint 4 |
+
+### Test results (sprint-level DoD, plan.md §5.3)
+
+| Suite | Result |
+|---|---|
+| Unit | ✅ 4/4 passing on all 12 matrix cells |
+| Integration / property / differential / regression / PennyLane | n/a: no simulator code yet (start in Sprints 1–4) |
+| Benchmarks | n/a until Sprint 7 |
+| Coverage (project / patch) | ✅ 100% / gate active (diff-cover ≥90%) |
+| Build + wheel smoke test | ✅ wheel installs and imports in a clean venv |
+| Docs build | ✅ `mkdocs build --strict`; deployed to GitHub Pages (HTTP 200) |
+| `main` CI after every merge | ✅ all CI and Docs runs green |
+| Release pipeline | ⏳ logic tested locally and actionlint-clean; end-to-end run with the first functional release |
+
+### Flow metrics (plan.md §4.2)
+
+| Metric | Value |
+|---|---|
+| Throughput | 16 of 19 points done (QS-105, 3 points, pending manual views) |
+| Median PR open → merge (review wait + CI) | 55 min (max 65 min) |
+| Sprint duration | Same day (2026-11-09), about 3 hours |
+| Escaped defects | 0 |
+
+### Demo
+
+- A direct push to `main` is rejected: `GH006: Protected branch update failed`.
+- An under-tested change fails the gate: `FAIL Required test coverage of 85.0% not reached. Total coverage: 27.27%`.
+- Docs site: <https://hasanahmed77.github.io/high-performance-differentiable-quantum-simulator/>
+- Board: <https://github.com/users/hasanahmed77/projects/2>
 
 ## Retrospective
 
-*(Keep / change / try.)*
+| Keep | Change | Try |
+|---|---|---|
+| Verifying gates by forcing them to fail (coverage drop, direct push) | **Stacked PRs:** retarget a stacked PR to `main` *before* deleting its base branch. Deleting it auto-closed #99, which had to be replaced by #100. | Fewer, slightly larger PRs where stories can't be tested alone, to cut repeated CI cycles |
+| SHA-pinned actions and the single `CI success` aggregate check | **WIP limits were exceeded** (9 items In Review vs a limit of 3). The bootstrap made it unavoidable, but from Sprint 1 a new PR opens only once In Review is ≤3. | Check facts (dependency support windows, PyPI policy) **before** recommending a decision: D4 and the 0.0.0 placeholder both had to be revised |
+| Checking policies before publishing (PEP 541) | **"Require up-to-date branches" costs a full CI rerun per queued PR**, about 10 minutes each with free macOS runners | Merge PRs in dependency order as soon as each is green, to keep the rebase queue short |
+
+## Forecast update
+
+Not enough data yet; the first throughput-based forecast follows Sprint 2 (plan.md §8).
