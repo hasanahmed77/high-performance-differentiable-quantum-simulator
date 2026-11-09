@@ -1,0 +1,26 @@
+name: Spike
+description: A time-boxed investigation that answers a question before work is planned
+title: "QS-XXX: Spike: "
+labels: ["type:spike"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What do we need to learn?
+    validations:
+      required: true
+  - type: input
+    id: timebox
+    attributes:
+      label: Timebox
+      placeholder: e.g. 1 day
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Expected output
+      description: What artifact closes the spike (notes, an ADR draft, a prototype branch, a benchmark)?
+    validations:
+      required: true

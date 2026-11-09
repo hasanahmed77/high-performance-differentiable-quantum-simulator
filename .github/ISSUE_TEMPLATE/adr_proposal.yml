@@ -1,0 +1,30 @@
+name: ADR proposal
+description: Propose an architectural decision (public API, backend protocol, IR, build, performance strategy)
+title: "ADR: "
+labels: ["type:docs"]
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What problem forces a decision now? What constraints apply?
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Options considered
+      description: At least two options, each with its trade-offs.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed decision
+    validations:
+      required: true
+  - type: textarea
+    id: consequences
+    attributes:
+      label: Consequences
+      description: What becomes easier or harder? Any performance, compatibility or maintenance impact?
