@@ -27,6 +27,13 @@ TOLERANCES: dict[np.dtype[Any], Tolerance] = {
 GRADIENT_FD = Tolerance(atol=1e-5, rtol=0.0)
 """Gradients compared against central finite differences (step 1e-7, complex128)."""
 
+GRADIENT_FD_COMPLEX64 = Tolerance(atol=1e-3, rtol=0.0)
+"""Gradients compared against central finite differences in complex64 (step 1e-3).
+
+Rounding error is about eps32 * |O| / h = 6e-5 * |O| (ADR-0004 D7); 2.1e-4 was the worst case
+measured on 200 random circuits.
+"""
+
 
 def tolerance_for(dtype: npt.DTypeLike) -> Tolerance:
     """Return the tolerance for ``dtype`` (complex128 or complex64)."""

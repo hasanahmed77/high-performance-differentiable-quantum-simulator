@@ -41,3 +41,7 @@ The reference is generated from the docstrings in the source code, so it always 
 ## Measurements
 
 ::: ketjet.measurements
+
+## Gradients
+
+::: ketjet.gradients

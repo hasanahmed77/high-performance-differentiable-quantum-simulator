@@ -16,7 +16,7 @@ Circuit(2) [H(0), CNOT(0, 1)]
 
 import json
 from collections.abc import Iterable, Iterator, Mapping, Sequence
-from typing import Any, Final, Self
+from typing import TYPE_CHECKING, Any, Final, Self
 
 from ketjet import measurements
 from ketjet import operations as ops
@@ -26,6 +26,12 @@ from ketjet.measurements import Probabilities, Samples, Seed
 from ketjet.observables import Observable
 from ketjet.operations import Operation, Parameter, ParamLike, display_name
 from ketjet.statevector import DTypeLike, StateVector, validate_n_wires
+
+if TYPE_CHECKING:
+    import numpy as np
+    import numpy.typing as npt
+
+    from ketjet import gradients
 
 __all__ = ["Circuit", "format_operation"]
 
@@ -352,6 +358,30 @@ class Circuit:
         """Run the circuit and return the exact variance of ``observable``."""
         final, engine = self._final_state(backend, dtype)
         return engine.var(final, observable)
+
+    def gradient(
+        self,
+        observable: Observable,
+        values: "gradients.Values",
+        *,
+        method: "gradients.Method" = "finite-diff",
+        backend: Backend[Any] | None = None,
+        dtype: DTypeLike = "complex128",
+    ) -> "npt.NDArray[np.float64]":
+        """Return the gradient of ``expval(observable)`` with respect to :attr:`parameters`.
+
+        See :func:`ketjet.gradients.grad`.
+
+        Examples
+        --------
+        >>> from ketjet.observables import Z
+        >>> theta = Parameter("theta")
+        >>> Circuit(1).rx(theta, 0).gradient(Z(0), {"theta": 0.0}).round(6)
+        array([0.])
+        """
+        from ketjet import gradients  # noqa: PLC0415  # gradients imports this module
+
+        return gradients.grad(self, observable, values, method=method, backend=backend, dtype=dtype)
 
     # ------------------------------------------------------------------- serialization
 
