@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Proposed |
+| **Status** | Accepted (approved by the PO in #126) |
 | **Date** | 2026-11-11 |
 | **Deciders** | Product Owner / Architect |
 | **Related stories** | QS-501 (this spike), QS-502, QS-503, QS-504, QS-505; later QS-506 (broadcasting), QS-507 (version range), QS-606 (JAX backprop) |

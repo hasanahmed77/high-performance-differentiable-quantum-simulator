@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Planned (awaiting PO approval of ADR-0005) |
+| **Status** | In progress |
 | **Started** | 2026-11-11 |
 | **Milestone** | `Sprint 04 – PennyLane device` |
 | **Sprint goal** | Anyone can `pip install "ketjet[pennylane]"` from PyPI and run, and differentiate, any PennyLane QNode on `qml.device("ketjet.qubit")`, with PennyLane's own device test suite passing. Release **v0.1.0**. |
@@ -11,7 +11,7 @@
 
 | ID | Story | Pts | Depends on | PR |
 |---|---|---|---|---|
-| QS-501 | Spike and ADR-0005: the PennyLane device design | 2 | n/a | this PR |
+| QS-501 | Spike and ADR-0005: the PennyLane device design | 2 | n/a | #126 |
 | QS-502 | `qml.device("ketjet.qubit")` via an entry point; tapes translate 1:1 and execute; analytic and shot measurements | 5 | ADR-0005 | |
 | QS-503 | Unsupported operations decompose automatically; clear errors for anything that can't | 3 | QS-502 | |
 | QS-504 | Device gradients: `diff_method="adjoint"` and single-pass VJP (backprop deferred to the JAX backend, ADR-0005 D4) | 5 | QS-503 | |
