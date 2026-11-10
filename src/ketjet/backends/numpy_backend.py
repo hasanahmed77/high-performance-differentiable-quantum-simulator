@@ -1,10 +1,13 @@
 """The NumPy reference backend: the correctness oracle for every faster backend (plan.md §3)."""
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 
 import numpy as np
 
+from ketjet import measurements
 from ketjet.kernels import apply_matrix, n_wires_of
+from ketjet.measurements import Probabilities
+from ketjet.observables import Observable
 from ketjet.operations import Operation
 from ketjet.statevector import DTypeLike, StateVector, zero_state
 
@@ -63,3 +66,15 @@ class NumPyBackend:
     def to_numpy(self, state: StateVector) -> StateVector:
         """Return a copy of the amplitudes (the caller may modify it freely)."""
         return state.copy()
+
+    def probs(self, state: StateVector, wires: Sequence[int] | None = None) -> Probabilities:
+        """Return measurement probabilities of ``wires`` (see :func:`ketjet.measurements.probs`)."""
+        return measurements.probs(state, wires)
+
+    def expval(self, state: StateVector, observable: Observable) -> float:
+        """Return the expectation value of ``observable``."""
+        return measurements.expval(state, observable)
+
+    def var(self, state: StateVector, observable: Observable) -> float:
+        """Return the variance of ``observable``."""
+        return measurements.var(state, observable)

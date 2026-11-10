@@ -124,6 +124,11 @@ enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
 module = ["hypothesis.*"]
 follow_untyped_imports = true
 
+[[tool.mypy.overrides]]
+# PennyLane is a test-only dependency and ships no type information.
+module = ["pennylane", "pennylane.*"]
+ignore_missing_imports = true
+
 # --------------------------------------------------------------------------- pytest
 [tool.pytest.ini_options]
 minversion = "9.0"
