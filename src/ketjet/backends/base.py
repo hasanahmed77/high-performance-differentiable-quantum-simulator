@@ -8,11 +8,16 @@ test suite runs against every backend.
 must use the returned state and must not read or reuse the state they passed in. Pure backends
 (NumPy, JAX) return a new state; in-place backends (C++, CUDA) may update the buffer and return it,
 avoiding a second ``2**n`` allocation.
+
+**Measurements are read-only (ADR-0003 D6):** ``probs``, ``expval`` and ``var`` don't consume the
+state. Backends compute them where the state lives (e.g. on a GPU) and return only the results.
 """
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import Protocol, TypeVar, runtime_checkable
 
+from ketjet.measurements import Probabilities
+from ketjet.observables import Observable
 from ketjet.operations import Operation
 from ketjet.statevector import DTypeLike, StateVector
 
@@ -52,4 +57,16 @@ class Backend(Protocol[StateT]):
 
     def to_numpy(self, state: StateT) -> StateVector:
         """Return the amplitudes as a flat NumPy array (wire 0 = most significant bit)."""
+        ...
+
+    def probs(self, state: StateT, wires: Sequence[int] | None = None) -> Probabilities:
+        """Return measurement probabilities of ``wires`` (``wires[0]`` = most significant bit)."""
+        ...
+
+    def expval(self, state: StateT, observable: Observable) -> float:
+        """Return the expectation value of ``observable``."""
+        ...
+
+    def var(self, state: StateT, observable: Observable) -> float:
+        """Return the variance of ``observable``."""
         ...

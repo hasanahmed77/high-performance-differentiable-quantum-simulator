@@ -37,3 +37,7 @@ The reference is generated from the docstrings in the source code, so it always 
 ## Observables
 
 ::: ketjet.observables
+
+## Measurements
+
+::: ketjet.measurements

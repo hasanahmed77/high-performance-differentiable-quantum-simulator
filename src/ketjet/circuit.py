@@ -19,8 +19,12 @@ from collections.abc import Iterable, Iterator, Mapping, Sequence
 from typing import Any, Final, Self
 
 from ketjet import operations as ops
+from ketjet.backends.base import Backend
+from ketjet.backends.numpy_backend import NumPyBackend
+from ketjet.measurements import Probabilities
+from ketjet.observables import Observable
 from ketjet.operations import Operation, Parameter, ParamLike, display_name
-from ketjet.statevector import validate_n_wires
+from ketjet.statevector import DTypeLike, StateVector, validate_n_wires
 
 __all__ = ["Circuit", "format_operation"]
 
@@ -227,6 +231,88 @@ class Circuit:
         """Compact one-line representation."""
         body = ", ".join(format_operation(op) for op in self._ops)
         return f"Circuit({self._n_wires}) [{body}]"
+
+    # ------------------------------------------------------------------- execution
+
+    def _final_state(
+        self, backend: Backend[Any] | None, dtype: DTypeLike
+    ) -> tuple[Any, Backend[Any]]:
+        if not self.is_bound:
+            names = ", ".join(p.name for p in self.parameters)
+            raise ValueError(
+                f"The circuit has unbound parameter(s): {names}. Call bind(...) before running it."
+            )
+        engine: Backend[Any] = backend if backend is not None else NumPyBackend()
+        state = engine.apply_operations(engine.zero_state(self._n_wires, dtype), self._ops)
+        return state, engine
+
+    def state(
+        self, *, backend: Backend[Any] | None = None, dtype: DTypeLike = "complex128"
+    ) -> StateVector:
+        """Run the circuit from ``|0…0⟩`` and return the final amplitudes.
+
+        Parameters
+        ----------
+        backend
+            Backend to run on (default: :class:`~ketjet.backends.NumPyBackend`).
+        dtype
+            Precision: ``"complex128"`` (default) or ``"complex64"``.
+
+        Raises
+        ------
+        ValueError
+            If symbolic parameters are unbound.
+        """
+        final, engine = self._final_state(backend, dtype)
+        return engine.to_numpy(final)
+
+    def probs(
+        self,
+        wires: Sequence[int] | None = None,
+        *,
+        backend: Backend[Any] | None = None,
+        dtype: DTypeLike = "complex128",
+    ) -> Probabilities:
+        """Run the circuit and return measurement probabilities of ``wires`` (default: all).
+
+        ``wires[0]`` is the most significant bit of the result index.
+
+        Examples
+        --------
+        >>> Circuit(2).h(0).cnot(0, 1).probs().round(3)
+        array([0.5, 0. , 0. , 0.5])
+        """
+        final, engine = self._final_state(backend, dtype)
+        return engine.probs(final, wires)
+
+    def expval(
+        self,
+        observable: Observable,
+        *,
+        backend: Backend[Any] | None = None,
+        dtype: DTypeLike = "complex128",
+    ) -> float:
+        """Run the circuit and return the exact expectation value of ``observable``.
+
+        Examples
+        --------
+        >>> from ketjet.observables import Z
+        >>> round(Circuit(2).h(0).cnot(0, 1).expval(Z(0) @ Z(1)), 12)
+        1.0
+        """
+        final, engine = self._final_state(backend, dtype)
+        return engine.expval(final, observable)
+
+    def var(
+        self,
+        observable: Observable,
+        *,
+        backend: Backend[Any] | None = None,
+        dtype: DTypeLike = "complex128",
+    ) -> float:
+        """Run the circuit and return the exact variance of ``observable``."""
+        final, engine = self._final_state(backend, dtype)
+        return engine.var(final, observable)
 
     # ------------------------------------------------------------------- serialization
 
