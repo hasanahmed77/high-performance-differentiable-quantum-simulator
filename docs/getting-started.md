@@ -73,6 +73,15 @@ bell.expval(H)
 Pauli strings are applied without building a matrix, so Hamiltonians with many terms stay cheap.
 `Hermitian(matrix, wires)` covers any other observable.
 
+## Sampling and shots
+
+Real hardware returns samples, not probabilities. ketjet can do the same, reproducibly:
+
+```python
+bell.sample(5, seed=7)                       # (5, 2) array of correlated bits
+bell.expval(X(0), shots=10_000, seed=7)      # ≈ 0.0, with statistical noise
+```
+
 ## Precision
 
 Everything runs in `complex128` by default. Use `dtype="complex64"` to halve memory:

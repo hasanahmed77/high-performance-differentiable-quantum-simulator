@@ -6,7 +6,7 @@ import numpy as np
 
 from ketjet import measurements
 from ketjet.kernels import apply_matrix, n_wires_of
-from ketjet.measurements import Probabilities
+from ketjet.measurements import Probabilities, Samples, Seed
 from ketjet.observables import Observable
 from ketjet.operations import Operation
 from ketjet.statevector import DTypeLike, StateVector, zero_state
@@ -78,3 +78,9 @@ class NumPyBackend:
     def var(self, state: StateVector, observable: Observable) -> float:
         """Return the variance of ``observable``."""
         return measurements.var(state, observable)
+
+    def sample(
+        self, state: StateVector, shots: int, wires: Sequence[int] | None = None, seed: Seed = None
+    ) -> Samples:
+        """Return measured bits (see :func:`ketjet.measurements.sample`)."""
+        return measurements.sample(state, shots, wires, seed)
