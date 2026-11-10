@@ -9,14 +9,15 @@ must use the returned state and must not read or reuse the state they passed in.
 (NumPy, JAX) return a new state; in-place backends (C++, CUDA) may update the buffer and return it,
 avoiding a second ``2**n`` allocation.
 
-**Measurements are read-only (ADR-0003 D6):** ``probs``, ``expval`` and ``var`` don't consume the
-state. Backends compute them where the state lives (e.g. on a GPU) and return only the results.
+**Measurements are read-only (ADR-0003 D6):** ``probs``, ``expval``, ``var`` and ``sample`` don't
+consume the state. Backends compute them where the state lives (e.g. on a GPU) and return only
+the results.
 """
 
 from collections.abc import Iterable, Sequence
 from typing import Protocol, TypeVar, runtime_checkable
 
-from ketjet.measurements import Probabilities
+from ketjet.measurements import Probabilities, Samples, Seed
 from ketjet.observables import Observable
 from ketjet.operations import Operation
 from ketjet.statevector import DTypeLike, StateVector
@@ -69,4 +70,10 @@ class Backend(Protocol[StateT]):
 
     def var(self, state: StateT, observable: Observable) -> float:
         """Return the variance of ``observable``."""
+        ...
+
+    def sample(
+        self, state: StateT, shots: int, wires: Sequence[int] | None = None, seed: Seed = None
+    ) -> Samples:
+        """Return ``(shots, len(wires))`` measured bits, reproducible for a given ``seed``."""
         ...

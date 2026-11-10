@@ -18,10 +18,11 @@ import json
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from typing import Any, Final, Self
 
+from ketjet import measurements
 from ketjet import operations as ops
 from ketjet.backends.base import Backend
 from ketjet.backends.numpy_backend import NumPyBackend
-from ketjet.measurements import Probabilities
+from ketjet.measurements import Probabilities, Samples, Seed
 from ketjet.observables import Observable
 from ketjet.operations import Operation, Parameter, ParamLike, display_name
 from ketjet.statevector import DTypeLike, StateVector, validate_n_wires
@@ -289,10 +290,24 @@ class Circuit:
         self,
         observable: Observable,
         *,
+        shots: int | None = None,
+        seed: Seed = None,
         backend: Backend[Any] | None = None,
         dtype: DTypeLike = "complex128",
     ) -> float:
-        """Run the circuit and return the exact expectation value of ``observable``.
+        """Run the circuit and return the expectation value of ``observable``.
+
+        Parameters
+        ----------
+        observable
+            The observable.
+        shots
+            ``None`` (default) for the exact value; otherwise the number of measurements used to
+            estimate it (ADR-0003 D5).
+        seed
+            Seed for shot-based estimates.
+        backend, dtype
+            As for :meth:`state`.
 
         Examples
         --------
@@ -301,7 +316,31 @@ class Circuit:
         1.0
         """
         final, engine = self._final_state(backend, dtype)
-        return engine.expval(final, observable)
+        if shots is None:
+            return engine.expval(final, observable)
+        # Eigenbasis rotation needs arbitrary unitaries (QubitUnitary, QS-207), so the estimate
+        # currently runs on the host copy of the state. Device-side estimation: QS-903.
+        return measurements.estimate_expval(engine.to_numpy(final), observable, shots, seed)
+
+    def sample(
+        self,
+        shots: int,
+        wires: Sequence[int] | None = None,
+        *,
+        seed: Seed = None,
+        backend: Backend[Any] | None = None,
+        dtype: DTypeLike = "complex128",
+    ) -> Samples:
+        """Run the circuit and return ``(shots, len(wires))`` measured bits.
+
+        Examples
+        --------
+        >>> bits = Circuit(2).h(0).cnot(0, 1).sample(5, seed=7)
+        >>> bits.shape, bool((bits[:, 0] == bits[:, 1]).all())
+        ((5, 2), True)
+        """
+        final, engine = self._final_state(backend, dtype)
+        return engine.sample(final, shots, wires, seed)
 
     def var(
         self,
