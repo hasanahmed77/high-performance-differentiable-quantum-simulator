@@ -40,10 +40,12 @@ nav:
       - "ADR-0001: Statevector representation": adr/0001-statevector-representation.md
       - "ADR-0002: Circuit IR": adr/0002-circuit-ir.md
       - "ADR-0003: Measurements and observables": adr/0003-measurements-and-observables.md
+      - "ADR-0004: Differentiation": adr/0004-differentiation.md
   - Sprint reports:
       - "Sprint 00: Foundations": sprints/sprint-00.md
       - "Sprint 01: The engine": sprints/sprint-01.md
       - "Sprint 02: Circuits and measurements": sprints/sprint-02.md
+      - "Sprint 03: Differentiation": sprints/sprint-03.md
   - Development: development.md
 
 exclude_docs: |
