@@ -47,3 +47,7 @@ The reference is generated from the docstrings in the source code, so it always 
 ::: ketjet.gradients
 
 ::: ketjet.adjoint
+
+## PennyLane device
+
+::: ketjet.pennylane

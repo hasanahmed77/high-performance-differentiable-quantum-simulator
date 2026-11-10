@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted (approved by the PO in #126) |
+| **Status** | Accepted (approved by the PO on 2026-11-11 in #126) |
 | **Date** | 2026-11-11 |
 | **Deciders** | Product Owner / Architect |
 | **Related stories** | QS-501 (this spike), QS-502, QS-503, QS-504, QS-505; later QS-506 (broadcasting), QS-507 (version range), QS-606 (JAX backprop) |
@@ -57,7 +57,7 @@ device sees it. That keeps gradient bookkeeping trivial (D4): tape parameter *k*
 | Option | Pros | Cons |
 |---|---|---|
 | **A. Decompose in PennyLane, translate 1:1 (chosen)** | PennyLane owns decomposition rules and their correctness; trainable parameters map to slots directly | Slightly more preprocessing work per tape |
-| B. Translate richer ops ourselves (adjoints, `CRot`, …) | Fewer gates after decomposition | Rewritten parameters break the parameter-to-slot map, and every rule is ours to get right |
+| B. Translate richer ops ourselves (adjoints of rotations, …) | Fewer gates after decomposition | Rewritten parameters break the parameter-to-slot map, and every rule is ours to get right |
 | C. Execute PennyLane's matrices (`op.matrix()`) | Supports everything at once | Throws away structure: no fast kernels, no adjoint derivatives, dense matrices on many wires |
 
 ### D3. The supported set
@@ -66,12 +66,13 @@ device sees it. That keeps gradient bookkeeping trivial (D4): tape parameter *k*
   `SX`, `RX`, `RY`, `RZ`, `PhaseShift`, `Rot`, `U3`, `SWAP`, `ISWAP`.
 - **Controlled gates:** `CNOT`, `CY`, `CZ`, `CRX`, `CRY`, `CRZ`, `ControlledPhaseShift`, `Toffoli`, `CSWAP`,
   `MultiControlledX` and `Controlled(base)` for any supported base, with control values. They become ketjet
-  operations with controls (ADR-0002 D2).
+  operations with controls (ADR-0002 D2). This includes `CRot`, which PennyLane implements as a controlled `Rot`
+  with the same three parameters (amended in QS-502; the first draft listed it as decomposed).
 - **Adjoints of fixed gates:** `Adjoint(S)`, `Adjoint(T)`, `Adjoint(SX)`, `Adjoint(ISWAP)`, which are ketjet's `Sdg`,
   `Tdg`, `SXdg` and `ISWAPdg` and take no parameters.
 - **`GlobalPhase`:** applied by the device as a scalar on the state, so `qml.state()` matches `default.qubit`
   exactly.
-- Everything else, including `CRot`, `QubitUnitary`, `StatePrep`, `BasisState` and templates, is decomposed by
+- Everything else, including `QubitUnitary`, `StatePrep`, `BasisState` and templates, is decomposed by
   PennyLane into the set above.
 
 ### D4. Gradients: adjoint and VJP on the device; everything else through PennyLane
@@ -130,7 +131,7 @@ device sees it. That keeps gradient bookkeeping trivial (D4): tape parameter *k*
   - Faster backends (JAX, C++, CUDA) plug in behind the same device without changing it.
 - **Negative:**
   - No backprop until the JAX backend. Users who pick it get a clear error, not a slow path.
-  - Decomposition can add gates, for example `CRot` becomes three gates. Fusion (Sprint 10) recovers the speed.
+  - Decomposition can add gates, for example `QubitUnitary` becomes several rotations. Fusion (Sprint 10) recovers the speed.
   - The PennyLane API moves quickly, so the version range is pinned and needs maintenance (QS-507).
 - **Follow-ups:**
   - Native broadcasting (QS-506).
@@ -144,7 +145,7 @@ device sees it. That keeps gradient bookkeeping trivial (D4): tape parameter *k*
 - `pl-device-test` passes, with every skip documented (QS-505).
 - Differential QNode tests match `default.qubit` at the standard tolerances (plan.md §6.3).
 - **Gradients match `default.qubit` backprop:** for adjoint and VJP, including gates that only reach the device
-  through decomposition (for example `qml.adjoint(qml.RX(x))`, `qml.CRot`, `StronglyEntanglingLayers`). This is the
+  through decomposition (for example `qml.adjoint(qml.RX(x))`, `QubitUnitary`, `StronglyEntanglingLayers`). This is the
   test that D2's 1:1 rule holds.
 - **One backend call per tape:** a counting test checks that `compute_vjp` with M measurements makes one
   `adjoint_jacobian` call per tape.
