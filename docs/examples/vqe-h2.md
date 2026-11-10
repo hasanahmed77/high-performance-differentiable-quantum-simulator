@@ -92,14 +92,15 @@ print(f"{(hartree_fock - exact) * 1000:.2f} mHa")  # 20.59 mHa
 ## The three methods agree
 
 At the optimum the gradient vanishes. Away from it, adjoint, parameter-shift (the method that also works on
-hardware) and finite differences give the same derivative:
+hardware) and finite differences give the same derivative. Finite differences are accurate to about $10^{-9}$
+here, so six decimals is as far as all three agree on every platform:
 
 ```python
 point = {"theta": 2.0}
 for method in ("adjoint", "parameter-shift", "finite-diff"):
     g = gradients.grad(ansatz, H, point, method=method)[0]
-    print(f"{method:>15}: {g:.8f}")
-#         adjoint: -0.79189488
-# parameter-shift: -0.79189488
-#     finite-diff: -0.79189488
+    print(f"{method:>15}: {g:.6f}")
+#         adjoint: -0.791895
+# parameter-shift: -0.791895
+#     finite-diff: -0.791895
 ```
