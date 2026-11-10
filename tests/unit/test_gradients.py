@@ -102,7 +102,8 @@ def test_circuit_without_symbols_has_an_empty_gradient() -> None:
 def test_circuit_gradient_convenience_method() -> None:
     c = Circuit(1).ry(t, 0)
     np.testing.assert_array_equal(
-        c.gradient(Z(0), {"t": 0.4}), grad(c, Z(0), {"t": 0.4}, method="finite-diff")
+        c.gradient(Z(0), {"t": 0.4}, method="finite-diff"),
+        grad(c, Z(0), {"t": 0.4}, method="finite-diff"),
     )
 
 
