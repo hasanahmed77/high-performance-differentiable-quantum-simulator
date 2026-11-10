@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Proposed (awaiting PO approval) |
+| **Status** | Accepted (approved by the PO on 2026-11-10 in #118) |
 | **Date** | 2026-11-10 |
 | **Deciders** | Product Owner / Architect |
 | **Related stories** | QS-401, QS-402, QS-403, QS-404, QS-406; later QS-405, QS-407, QS-504 (PennyLane), QS-606 (JAX), QS-707 (native), QS-805 (fusion), QS-904 (GPU) |
