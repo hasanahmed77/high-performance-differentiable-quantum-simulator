@@ -7,7 +7,10 @@ symbol, which is the chain rule (ADR-0004 D1).
 
 Methods
 -------
-``"parameter-shift"`` (default)
+``"adjoint"`` (default)
+    Exact, for expectation values. One forward and one backward pass, whatever the number of
+    parameters, with memory independent of circuit depth (ADR-0004 D3). Runs on the backend.
+``"parameter-shift"``
     Exact. Each slot is shifted by the rule derived from its gate's generator spectrum
     (ADR-0004 D5): two evaluations for most gates, four for controlled rotations. Works with
     ``shots``, as on hardware.
@@ -46,7 +49,7 @@ from ketjet.statevector import DTypeLike, as_complex_dtype
 
 __all__ = ["GradientOptions", "Measurement", "Method", "Values", "grad", "jacobian", "shift_rule"]
 
-Method = Literal["parameter-shift", "finite-diff"]
+Method = Literal["adjoint", "parameter-shift", "finite-diff"]
 """A differentiation method name."""
 
 Measurement = Literal["expval", "var"]
@@ -57,9 +60,10 @@ Values = Mapping[Parameter, float] | Mapping[str, float]
 
 Jacobian = npt.NDArray[np.float64]
 
-_METHODS: Final[tuple[str, ...]] = ("parameter-shift", "finite-diff")
+_METHODS: Final[tuple[str, ...]] = ("adjoint", "parameter-shift", "finite-diff")
 _MEASUREMENTS: Final[tuple[str, ...]] = ("expval", "var")
 _SUPPORTED: Final[dict[str, frozenset[str]]] = {
+    "adjoint": frozenset({"expval"}),
     "parameter-shift": frozenset({"expval"}),
     "finite-diff": frozenset({"expval", "var"}),
 }
@@ -258,7 +262,7 @@ def jacobian(  # noqa: PLR0913  # keyword-only options, as in Circuit.expval
     observables: Sequence[Observable],
     values: Values,
     *,
-    method: Method = "parameter-shift",
+    method: Method = "adjoint",
     measurement: Measurement = "expval",
     backend: Backend[Any] | None = None,
     dtype: DTypeLike = "complex128",
@@ -317,6 +321,11 @@ def jacobian(  # noqa: PLR0913  # keyword-only options, as in Circuit.expval
     observables = list(observables)
     problem = _prepare(circuit, values)
     engine: Backend[Any] = backend if backend is not None else NumPyBackend()
+    if method == "adjoint":
+        slot_jacobian = engine.adjoint_jacobian(
+            problem.n_wires, problem.operations, observables, problem.slots, dtype=dtype
+        )
+        return _to_symbols(np.asarray(slot_jacobian, dtype=np.float64), problem)
     evaluate = _evaluator(
         problem.n_wires,
         observables,

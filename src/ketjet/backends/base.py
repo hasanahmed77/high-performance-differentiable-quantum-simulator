@@ -12,10 +12,16 @@ avoiding a second ``2**n`` allocation.
 **Measurements are read-only (ADR-0003 D6):** ``probs``, ``expval``, ``var`` and ``sample`` don't
 consume the state. Backends compute them where the state lives (e.g. on a GPU) and return only
 the results.
+
+**Adjoint differentiation is one coarse method (ADR-0004 D4),** so native and GPU backends can run
+the whole backward pass on their own memory, without a host call per gate.
 """
 
 from collections.abc import Iterable, Sequence
 from typing import Protocol, TypeVar, runtime_checkable
+
+import numpy as np
+import numpy.typing as npt
 
 from ketjet.measurements import Probabilities, Samples, Seed
 from ketjet.observables import Observable
@@ -76,4 +82,20 @@ class Backend(Protocol[StateT]):
         self, state: StateT, shots: int, wires: Sequence[int] | None = None, seed: Seed = None
     ) -> Samples:
         """Return ``(shots, len(wires))`` measured bits, reproducible for a given ``seed``."""
+        ...
+
+    def adjoint_jacobian(
+        self,
+        n_wires: int,
+        operations: Sequence[Operation],
+        observables: Sequence[Observable],
+        trainable: Sequence[tuple[int, int]],
+        *,
+        dtype: DTypeLike = ...,
+    ) -> npt.NDArray[np.float64]:
+        """Return ``∂⟨O_m⟩/∂x_s`` for the ``trainable`` ``(operation, parameter)`` slots.
+
+        Shape ``(len(observables), len(trainable))``. The circuit starts from ``|0…0⟩``; memory
+        must not grow with circuit depth (see :mod:`ketjet.adjoint`).
+        """
         ...

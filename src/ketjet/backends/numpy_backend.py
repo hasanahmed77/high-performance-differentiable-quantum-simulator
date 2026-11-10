@@ -3,8 +3,9 @@
 from collections.abc import Iterable, Sequence
 
 import numpy as np
+import numpy.typing as npt
 
-from ketjet import measurements
+from ketjet import adjoint, measurements
 from ketjet.kernels import apply_matrix, n_wires_of
 from ketjet.measurements import Probabilities, Samples, Seed
 from ketjet.observables import Observable
@@ -84,3 +85,15 @@ class NumPyBackend:
     ) -> Samples:
         """Return measured bits (see :func:`ketjet.measurements.sample`)."""
         return measurements.sample(state, shots, wires, seed)
+
+    def adjoint_jacobian(
+        self,
+        n_wires: int,
+        operations: Sequence[Operation],
+        observables: Sequence[Observable],
+        trainable: Sequence[tuple[int, int]],
+        *,
+        dtype: DTypeLike = np.complex128,
+    ) -> npt.NDArray[np.float64]:
+        """Adjoint Jacobian (see :func:`ketjet.adjoint.adjoint_jacobian`)."""
+        return adjoint.adjoint_jacobian(n_wires, operations, observables, trainable, dtype=dtype)

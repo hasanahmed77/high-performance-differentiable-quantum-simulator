@@ -45,11 +45,13 @@ def test_a_control_can_make_a_spectrum_invalid() -> None:
 
 
 def test_gate_spec_validates_its_spectra() -> None:
-    m = GATES["RX"].matrix_fn
+    m, d = GATES["RX"].matrix_fn, GATES["RX"].derivative_fn
     with pytest.raises(ValueError, match="declares 0 generator spectra"):
-        GateSpec("Bad", 1, 1, m, lambda p: ("Bad", p))
+        GateSpec("Bad", 1, 1, m, lambda p: ("Bad", p), derivative_fn=d)
     with pytest.raises(ValueError, match="not equidistant"):
-        GateSpec("Bad", 1, 1, m, lambda p: ("Bad", p), generator_eigvals=((1.5, 2.5),))
+        GateSpec(
+            "Bad", 1, 1, m, lambda p: ("Bad", p), generator_eigvals=((1.5, 2.5),), derivative_fn=d
+        )
 
 
 def test_every_parametrized_gate_declares_a_spectrum() -> None:
@@ -135,18 +137,8 @@ def test_two_term_rule_is_wrong_for_a_controlled_rotation(x: float) -> None:
 
     two_term = 0.5 * (f(x + np.pi / 2) - f(x - np.pi / 2))
     assert abs(two_term - reference) > 1e-2
-    assert grad(c, obs, {"t": x})[0] == pytest.approx(reference, abs=GRADIENT_FD.atol)
-
-
-def test_default_method_is_parameter_shift() -> None:
-    c = Circuit(2).ry(a, 0).crx(b, 0, 1)
-    values = {"a": 0.3, "b": 1.2}
-    np.testing.assert_array_equal(
-        grad(c, Z(1), values), grad(c, Z(1), values, method="parameter-shift")
-    )
-    np.testing.assert_array_equal(
-        c.gradient(Z(1), values), grad(c, Z(1), values, method="parameter-shift")
-    )
+    four_term = grad(c, obs, {"t": x}, method="parameter-shift")[0]
+    assert four_term == pytest.approx(reference, abs=GRADIENT_FD.atol)
 
 
 @pytest.mark.parametrize("seed", range(20))
@@ -156,7 +148,7 @@ def test_parameter_shift_matches_finite_differences(seed: int) -> None:
     ops, values, _ = symbolize(random_circuit(n_wires, depth=15, rng=rng), rng)
     circuit = Circuit(n_wires, ops)
     observables = [Z(0), Z(0) @ X(1) - 0.3 * Z(1)]
-    exact = jacobian(circuit, observables, values)
+    exact = jacobian(circuit, observables, values, method="parameter-shift")
     approx = jacobian(circuit, observables, values, method="finite-diff")
     np.testing.assert_allclose(exact, approx, atol=GRADIENT_FD.atol, rtol=GRADIENT_FD.rtol)
 
@@ -167,14 +159,14 @@ def test_parameter_shift_in_complex64(seed: int) -> None:
     ops, values, _ = symbolize(random_circuit(3, depth=15, rng=rng), rng)
     circuit = Circuit(3, ops)
     observables = [Z(0), X(1) @ Z(2)]
-    double = jacobian(circuit, observables, values)
-    single = jacobian(circuit, observables, values, dtype="complex64")
+    double = jacobian(circuit, observables, values, method="parameter-shift")
+    single = jacobian(circuit, observables, values, method="parameter-shift", dtype="complex64")
     assert_close(single, double, np.complex64)
 
 
 def test_parameter_shift_rejects_variance() -> None:
     with pytest.raises(ValueError, match="can't differentiate 'var'; use method='finite-diff'"):
-        grad(Circuit(1).rx(a, 0), Z(0), {"a": 0.1}, measurement="var")
+        grad(Circuit(1).rx(a, 0), Z(0), {"a": 0.1}, method="parameter-shift", measurement="var")
 
 
 def test_finite_differences_reject_shots() -> None:
@@ -190,13 +182,18 @@ SHOT_VALUES = {"a": 0.9, "b": -1.4}
 
 
 def test_shot_gradients_are_reproducible() -> None:
-    first = grad(SHOT_CIRCUIT, Z(1), SHOT_VALUES, shots=500, seed=11)
-    again = grad(SHOT_CIRCUIT, Z(1), SHOT_VALUES, shots=500, seed=11)
-    other = grad(SHOT_CIRCUIT, Z(1), SHOT_VALUES, shots=500, seed=12)
+    first = grad(SHOT_CIRCUIT, Z(1), SHOT_VALUES, shots=500, seed=11, method="parameter-shift")
+    again = grad(SHOT_CIRCUIT, Z(1), SHOT_VALUES, shots=500, seed=11, method="parameter-shift")
+    other = grad(SHOT_CIRCUIT, Z(1), SHOT_VALUES, shots=500, seed=12, method="parameter-shift")
     np.testing.assert_array_equal(first, again)
     assert not np.array_equal(first, other)
     from_generator = grad(
-        SHOT_CIRCUIT, Z(1), SHOT_VALUES, shots=500, seed=np.random.default_rng(11)
+        SHOT_CIRCUIT,
+        Z(1),
+        SHOT_VALUES,
+        shots=500,
+        seed=np.random.default_rng(11),
+        method="parameter-shift",
     )
     np.testing.assert_array_equal(first, from_generator)
 
@@ -204,7 +201,7 @@ def test_shot_gradients_are_reproducible() -> None:
 def test_every_shifted_evaluation_draws_independently() -> None:
     # Two symbols on identical gates: correlated draws would give identical estimates.
     c = Circuit(1).ry(a, 0).ry(b, 0)
-    g = grad(c, Z(0), {"a": 0.5, "b": 0.5}, shots=200, seed=3)
+    g = grad(c, Z(0), {"a": 0.5, "b": 0.5}, shots=200, seed=3, method="parameter-shift")
     assert g[0] != g[1]
 
 
@@ -212,7 +209,9 @@ def test_every_shifted_evaluation_draws_independently() -> None:
 def test_shot_gradients_are_within_four_sigma(seed: int) -> None:
     """Each slot's estimate is Σ c [f̂(+s) - f̂(-s)], and every f̂ averages ±1 eigenvalues of Z."""
     shots = 2000
-    estimate = grad(SHOT_CIRCUIT, Z(1), SHOT_VALUES, shots=shots, seed=seed)
+    estimate = grad(
+        SHOT_CIRCUIT, Z(1), SHOT_VALUES, shots=shots, seed=seed, method="parameter-shift"
+    )
     exact = grad(SHOT_CIRCUIT, Z(1), SHOT_VALUES)
     for p, (op_index, rule) in enumerate([(0, shift_rule((1.0,))), (2, shift_rule((0.5, 1.0)))]):
         name = SHOT_CIRCUIT.parameters[p].name
