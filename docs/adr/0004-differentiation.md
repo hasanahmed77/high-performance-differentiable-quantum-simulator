@@ -158,6 +158,10 @@ Central differences, $f'(x) \approx [f(x+h) - f(x-h)] / 2h$, with $h = 10^{-7}$ 
 $h = 10^{-3}$ for complex64, where the rounding error of a smaller step would dominate. The step is overridable.
 Finite differences are documented as approximate and are never the default.
 
+Tests compare complex64 finite differences at an absolute tolerance of $10^{-3}$ (added to plan.md §6.3 in
+QS-401): the rounding error is about $\varepsilon_{32} \lVert O \rVert / h \approx 6 \times 10^{-5}
+\lVert O \rVert$, and the largest error measured on 200 random circuits was $2.1 \times 10^{-4}$.
+
 ## Consequences
 
 - **Positive:** depth-independent gradient memory from the first release. One backend method covers native and

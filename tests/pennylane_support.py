@@ -40,9 +40,12 @@ _PL_BASE: dict[str, Callable[..., Any]] = {
 _PL_PAULI = {"X": qml.PauliX, "Y": qml.PauliY, "Z": qml.PauliZ}
 
 
-def to_pennylane(op: Operation) -> Any:
-    """Build the equivalent PennyLane operation (queued if called inside a QNode)."""
-    base = _PL_BASE[op.gate](op.wires, op.params)
+def to_pennylane(op: Operation, params: Sequence[Any] | None = None) -> Any:
+    """Build the equivalent PennyLane operation (queued if called inside a QNode).
+
+    ``params`` overrides ``op.params``, e.g. with trainable PennyLane values.
+    """
+    base = _PL_BASE[op.gate](op.wires, op.params if params is None else tuple(params))
     if not op.controls:
         return base
     return qml.ctrl(base, control=list(op.controls), control_values=list(op.control_values))

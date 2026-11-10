@@ -365,6 +365,7 @@ Pytest markers: `slow`, `gpu`, `native`, `pennylane`, `nightly`. Default PR runs
 | complex128 | 1e-10 | 1e-8 |
 | complex64 | 1e-5 | 1e-4 |
 | Gradients vs finite difference | 1e-5 (step 1e-7, complex128) | n/a |
+| Gradients vs finite difference, complex64 | 1e-3 (step 1e-3; ADR-0004 D7) | n/a |
 
 Tolerances live in one module (`tests/tolerances.py`) and are never loosened inline without an ADR.
 
