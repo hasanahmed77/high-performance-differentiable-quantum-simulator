@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In review (awaiting PO acceptance) |
+| **Status** | Done: accepted by the PO in #102 |
 | **Started** | 2026-11-09 |
 | **Milestone** | `Sprint 00 – Foundations` |
 | **Sprint goal** | An empty but production-grade repository in which every automated quality gate (QB3, QB4, QB5) is already enforced, and the delivery process (board, templates, protection) is in place. |
