@@ -15,7 +15,7 @@ Circuit(2) [H(0), CNOT(0, 1)]
 """
 
 import json
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from typing import Any, Final, Self
 
 from ketjet import operations as ops
@@ -119,6 +119,91 @@ class Circuit:
     def copy(self) -> "Circuit":
         """Return an independent copy (operations are immutable, so this is cheap)."""
         return Circuit(self._n_wires, self._ops)
+
+    # ------------------------------------------------------------------- parameters
+
+    @property
+    def parameters(self) -> tuple[Parameter, ...]:
+        """Unique symbolic parameters, in order of first appearance."""
+        seen: dict[Parameter, None] = {}
+        for op in self._ops:
+            for p in op.params:
+                if isinstance(p, Parameter):
+                    seen.setdefault(p, None)
+        return tuple(seen)
+
+    @property
+    def parameter_slots(self) -> tuple[tuple[int, int, Parameter], ...]:
+        """Every symbolic parameter position as ``(operation index, parameter index, symbol)``.
+
+        These are the trainable slots a gradient is taken with respect to (QS-402, QS-404). A
+        symbol used in several gates appears once per slot.
+
+        Examples
+        --------
+        >>> theta = Parameter("theta")
+        >>> Circuit(2).rx(theta, 0).cnot(0, 1).crz(theta, 0, 1).parameter_slots
+        ((0, 0, Parameter(name='theta')), (2, 0, Parameter(name='theta')))
+        """
+        return tuple(
+            (i, j, p)
+            for i, op in enumerate(self._ops)
+            for j, p in enumerate(op.params)
+            if isinstance(p, Parameter)
+        )
+
+    @property
+    def is_bound(self) -> bool:
+        """``True`` if no symbolic parameters remain."""
+        return not any(op.is_parametrized_symbolically for op in self._ops)
+
+    def bind(
+        self,
+        values: Mapping[Parameter, float] | Mapping[str, float] | None = None,
+        /,
+        **kwargs: float,
+    ) -> "Circuit":
+        """Return a new circuit with symbolic parameters replaced by values.
+
+        Parameters
+        ----------
+        values
+            Mapping from :class:`~ketjet.operations.Parameter` (or its name) to a value.
+        **kwargs
+            Values by parameter name, e.g. ``bind(theta=0.5)``.
+
+        Returns
+        -------
+        Circuit
+            A new circuit; this one is unchanged. Parameters not given stay symbolic.
+
+        Raises
+        ------
+        ValueError
+            If a name doesn't match any parameter of the circuit, or a value isn't finite.
+        TypeError
+            If a value isn't a real number.
+
+        Examples
+        --------
+        >>> theta = Parameter("theta")
+        >>> c = Circuit(1).rx(theta, 0)
+        >>> c.bind(theta=0.5) == c.bind({theta: 0.5}) == Circuit(1).rx(0.5, 0)
+        True
+        """
+        by_name: dict[str, float] = {
+            key.name if isinstance(key, Parameter) else key: value
+            for key, value in (values or {}).items()
+        }
+        by_name.update(kwargs)
+        known = {p.name for p in self.parameters}
+        unknown = sorted(set(by_name) - known)
+        if unknown:
+            raise ValueError(
+                f"Unknown parameter(s) {', '.join(unknown)}; the circuit has "
+                f"{', '.join(sorted(known)) or 'none'}."
+            )
+        return Circuit(self._n_wires, (op.bind(by_name) for op in self._ops))
 
     def inverse(self) -> "Circuit":
         """Return the inverse circuit: inverted operations in reverse order."""
