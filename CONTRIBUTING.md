@@ -52,6 +52,16 @@ Select them explicitly, e.g. `uv run pytest -m gpu`.
 4. **Open a PR** using the template. CI must be green on the full matrix.
 5. **Review and merge:** the maintainer reviews and squash-merges. `main` is protected, so direct pushes are rejected.
 
+## Changelog fragments
+
+Every PR with a user-visible change adds a fragment to `changes/` named `<issue>.<type>.md` (for example
+`25.added.md`), containing one or two sentences for users. Types: `added`, `changed`, `deprecated`, `removed`,
+`fixed`, `performance`, `security`. CI fails without a fragment. Docs-only and CI-only PRs use the
+`skip-changelog` label instead. See [`changes/README.md`](changes/README.md).
+
+Preview the next release's notes with `uv run towncrier build --draft --version X.Y.Z`. At release time,
+`uv run towncrier build --version X.Y.Z --yes` compiles the fragments into `CHANGELOG.md`.
+
 ## Definition of Done
 
 A change is ready to merge when:
@@ -61,6 +71,7 @@ A change is ready to merge when:
 - [ ] Changed lines have ≥90% coverage and the project stays ≥85%
 - [ ] Bug fixes include a regression test that fails before the fix
 - [ ] Public APIs have NumPy-style docstrings
+- [ ] A changelog fragment is added (or the PR is labelled `skip-changelog`)
 - [ ] CI is green on every OS and Python version
 
 The full definitions (story, sprint and release level) are in [plan.md §5](plan.md#5-definitions-of-ready-and-done).

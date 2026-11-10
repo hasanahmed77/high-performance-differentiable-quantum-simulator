@@ -2,6 +2,8 @@ name: CI
 
 on:
   pull_request:
+    # labeled/unlabeled re-run the changelog check when `skip-changelog` is added or removed
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   push:
     branches: [main]
   workflow_dispatch:
@@ -35,6 +37,24 @@ jobs:
         run: uv run pre-commit run --all-files --show-diff-on-failure
         env:
           SKIP: mypy
+
+  changelog:
+    name: Changelog fragment
+    # Docs-only or CI-only PRs opt out with the `skip-changelog` label.
+    if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-changelog')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+      - run: uv sync --group lint
+      - name: Require a news fragment in changes/
+        run: uv run towncrier check --compare-with origin/${{ github.base_ref }}
+      - name: Fragments render into the changelog
+        run: uv run towncrier build --draft --version 0.0.0.dev0 > /dev/null
 
   types:
     name: Types (mypy --strict)
@@ -96,9 +116,10 @@ jobs:
     name: CI success
     # Single required status check for branch protection; fails if any job failed or was cancelled.
     if: always()
-    needs: [lint, types, test, build]
+    needs: [lint, changelog, types, test, build]
     runs-on: ubuntu-latest
     steps:
       - name: Check all jobs passed
         run: |
-          echo '${{ toJSON(needs) }}' | jq -e 'to_entries | all(.value.result == "success")'
+          # "skipped" is fine: the changelog job is skipped on pushes and on `skip-changelog` PRs.
+          echo '${{ toJSON(needs) }}' | jq -e 'to_entries | all(.value.result == "success" or .value.result == "skipped")'
