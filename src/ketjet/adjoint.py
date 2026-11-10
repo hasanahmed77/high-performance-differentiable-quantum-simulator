@@ -17,16 +17,24 @@ the NumPy backend's implementation and the oracle for faster ones.
 """
 
 from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
 
-from ketjet.kernels import apply_matrix
+from ketjet.kernels import apply_structured
 from ketjet.observables import Observable
 from ketjet.operations import Operation
-from ketjet.statevector import DTypeLike, as_complex_dtype, zero_state
+from ketjet.statevector import DTypeLike, StateVector, as_complex_dtype, zero_state
 
 __all__ = ["adjoint_jacobian"]
+
+
+def _apply(state: StateVector, matrix: npt.NDArray[Any], op: Operation) -> StateVector:
+    """Apply ``matrix`` (the gate or its adjoint, which share structure) with the fast kernels."""
+    return apply_structured(
+        state, matrix, op.all_wires, diagonal=op.is_diagonal, permutation=op.is_permutation
+    )
 
 
 def adjoint_jacobian(
@@ -83,16 +91,19 @@ def adjoint_jacobian(
 
     psi = zero_state(n_wires, dtype)
     for op in ops:
-        psi = apply_matrix(psi, op.matrix(dtype), op.all_wires)
+        psi = _apply(psi, op.matrix(dtype), op)
     lambdas = [obs.apply(psi) for obs in observables]
 
     first = min(by_op)  # gates before the first trainable one don't affect any gradient
     for k in range(len(ops) - 1, first - 1, -1):
         op = ops[k]
         adjoint = op.matrix(dtype).conj().T
-        psi = apply_matrix(psi, adjoint, op.all_wires)  # now |ψ_{k-1}⟩
+        psi = _apply(psi, adjoint, op)  # now |ψ_{k-1}⟩
         for column, j in by_op.get(k, ()):
-            mu = apply_matrix(psi, op.derivative_matrix(j, dtype), op.all_wires)
+            # A diagonal gate's derivative is diagonal; a permutation's isn't a permutation.
+            mu = apply_structured(
+                psi, op.derivative_matrix(j, dtype), op.all_wires, diagonal=op.is_diagonal
+            )
             for m, lam in enumerate(lambdas):
                 jac[m, column] = 2 * np.vdot(lam, mu).real
             del mu  # free the scratch state before the next slot
@@ -100,5 +111,5 @@ def adjoint_jacobian(
             # One at a time, so each old λ is freed at once: building a new list would hold
             # 2M states instead of M.
             for m in range(len(lambdas)):
-                lambdas[m] = apply_matrix(lambdas[m], adjoint, op.all_wires)
+                lambdas[m] = _apply(lambdas[m], adjoint, op)
     return jac
