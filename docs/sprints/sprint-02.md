@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In review (awaiting PO acceptance) |
+| **Status** | Done: accepted by the PO in #117 |
 | **Started** | 2026-11-10 |
 | **Milestone** | `Sprint 02 – Circuits and measurements` |
 | **Sprint goal** | A user can build a circuit with a fluent API, bind parameters, and read every standard result (state, probabilities, expectation values, variances, samples), all matching PennyLane. |

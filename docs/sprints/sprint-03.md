@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In review |
+| **Status** | Done: accepted by the PO in #124 |
 | **Review** | 2026-11-11 |
 | **Started** | 2026-11-10 |
 | **Milestone** | `Sprint 03 – Differentiation` |
