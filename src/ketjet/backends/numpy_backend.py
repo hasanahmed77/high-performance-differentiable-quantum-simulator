@@ -28,7 +28,7 @@ class NumPyBackend:
     >>> from ketjet.operations import CNOT, H
     >>> backend = NumPyBackend()
     >>> bell = backend.apply_operations(backend.zero_state(2), [H(0), CNOT(0, 1)])
-    >>> backend.to_numpy(bell).round(3)
+    >>> (backend.to_numpy(bell) + 0.0).round(3)  # + 0.0 normalizes -0.0 across platforms
     array([0.707+0.j, 0.   +0.j, 0.   +0.j, 0.707+0.j])
     """
 
