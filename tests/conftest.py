@@ -2,9 +2,9 @@
 
 import importlib.util
 
-# PennyLane is a test-only dependency that isn't available on every Python version (e.g. 3.15).
-# Tests that need it use pytest.importorskip; the shared helper module must not even be collected
-# (pytest imports every module for --doctest-modules) when PennyLane is missing.
+# PennyLane is an optional extra (ketjet[pennylane]) and part of the test group. Tests that need it
+# use pytest.importorskip, so the suite still runs without it; the shared helper modules must not
+# even be collected (pytest imports every module for --doctest-modules) when it's missing.
 collect_ignore = (
     []
     if importlib.util.find_spec("pennylane")

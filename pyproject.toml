@@ -29,6 +29,12 @@ classifiers = [
 ]
 dependencies = ["numpy>=2.1"]
 
+[project.optional-dependencies]
+pennylane = ["pennylane>=0.44,<0.46"]
+
+[project.entry-points."pennylane.plugins"]
+"ketjet.qubit" = "ketjet.pennylane:KetjetQubit"
+
 [project.urls]
 Homepage = "https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator"
 Documentation = "https://hasanahmed77.github.io/high-performance-differentiable-quantum-simulator/"
@@ -41,7 +47,7 @@ test = [
     "pytest-cov>=7.0",
     "hypothesis>=6.140",
     "diff-cover>=9.0",
-    "pennylane>=0.44 ; python_full_version < '3.15'",
+    "pennylane>=0.44,<0.46",
 ]
 lint = [
     "ruff>=0.17",
@@ -144,7 +150,12 @@ addopts = [
 ]
 xfail_strict = true
 doctest_optionflags = ["NORMALIZE_WHITESPACE", "NUMBER"]
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    # autograd (a PennyLane dependency) has `return` in a `finally` block, which Python 3.14 warns
+    # about when compiling it (PEP 765). Not our code; every other warning stays an error.
+    "ignore:'return' in a 'finally' block:SyntaxWarning",
+]
 markers = [
     "slow: long-running tests (excluded from default PR runs)",
     "gpu: requires an NVIDIA GPU",

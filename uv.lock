@@ -653,12 +653,17 @@ dependencies = [
     { name = "numpy" },
 ]
 
+[package.optional-dependencies]
+pennylane = [
+    { name = "pennylane" },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "diff-cover" },
     { name = "hypothesis" },
     { name = "mypy" },
-    { name = "pennylane", marker = "python_full_version < '3.15'" },
+    { name = "pennylane" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-cov" },
@@ -678,20 +683,24 @@ lint = [
 test = [
     { name = "diff-cover" },
     { name = "hypothesis" },
-    { name = "pennylane", marker = "python_full_version < '3.15'" },
+    { name = "pennylane" },
     { name = "pytest" },
     { name = "pytest-cov" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "numpy", specifier = ">=2.1" }]
+requires-dist = [
+    { name = "numpy", specifier = ">=2.1" },
+    { name = "pennylane", marker = "extra == 'pennylane'", specifier = ">=0.44,<0.46" },
+]
+provides-extras = ["pennylane"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "diff-cover", specifier = ">=9.0" },
     { name = "hypothesis", specifier = ">=6.140" },
     { name = "mypy", specifier = ">=2.0" },
-    { name = "pennylane", marker = "python_full_version < '3.15'", specifier = ">=0.44" },
+    { name = "pennylane", specifier = ">=0.44,<0.46" },
     { name = "pre-commit", specifier = ">=4.0" },
     { name = "pytest", specifier = ">=9.0" },
     { name = "pytest-cov", specifier = ">=7.0" },
@@ -711,7 +720,7 @@ lint = [
 test = [
     { name = "diff-cover", specifier = ">=9.0" },
     { name = "hypothesis", specifier = ">=6.140" },
-    { name = "pennylane", marker = "python_full_version < '3.15'", specifier = ">=0.44" },
+    { name = "pennylane", specifier = ">=0.44,<0.46" },
     { name = "pytest", specifier = ">=9.0" },
     { name = "pytest-cov", specifier = ">=7.0" },
 ]
