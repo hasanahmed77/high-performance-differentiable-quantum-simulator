@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Proposed |
+| **Status** | Accepted (approved by the PO on 2026-11-10 in #110) |
 | **Date** | 2026-11-10 |
 | **Deciders** | Product Owner / Architect |
 | **Related stories** | QS-304, QS-305, QS-306; later QS-404 (adjoint), QS-504 (PennyLane), QS-603 (JAX), QS-903 (GPU) |

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Planned (awaiting ADR-0003 approval) |
+| **Status** | In progress (ADR-0003 accepted 2026-11-10) |
 | **Started** | 2026-11-10 |
 | **Milestone** | `Sprint 02 – Circuits and measurements` |
 | **Sprint goal** | A user can build a circuit with a fluent API, bind parameters, and read every standard result (state, probabilities, expectation values, variances, samples), all matching PennyLane. |
