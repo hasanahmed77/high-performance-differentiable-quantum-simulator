@@ -1,0 +1,320 @@
+"""The user-facing circuit builder (ADR-0002 D6).
+
+A :class:`Circuit` is a mutable, append-only builder with fluent gate methods. It stores
+immutable :class:`~ketjet.operations.Operation` values, and :attr:`Circuit.operations` returns a
+tuple snapshot, so compiler passes and backends can never be affected by later appends.
+
+Examples
+--------
+>>> from ketjet import Circuit
+>>> bell = Circuit(2).h(0).cnot(0, 1)
+>>> bell
+Circuit(2) [H(0), CNOT(0, 1)]
+>>> len(bell), bell.n_wires
+(2, 2)
+"""
+
+import json
+from collections.abc import Iterable, Iterator, Sequence
+from typing import Any, Final, Self
+
+from ketjet import operations as ops
+from ketjet.operations import Operation, Parameter, ParamLike, display_name
+from ketjet.statevector import validate_n_wires
+
+__all__ = ["Circuit", "format_operation"]
+
+_FORMAT: Final = "ketjet.circuit"
+_VERSION: Final = 1
+
+
+def _format_param(p: ParamLike) -> str:
+    return p.name if isinstance(p, Parameter) else f"{p:.6g}"
+
+
+def format_operation(op: Operation) -> str:
+    """Format an operation the way its constructor is called.
+
+    Examples
+    --------
+    >>> format_operation(ops.CRX(0.25, 0, 1)), format_operation(ops.ctrl(ops.H(2), [0]))
+    ('CRX(0.25, 0, 1)', 'ctrl(H(2), [0])')
+    """
+    name = display_name(op)
+    params = [_format_param(p) for p in op.params]
+    if not op.controls or ("-" not in name and name != "MultiControlledX"):
+        args = params + [str(w) for w in (op.controls + op.wires)]
+        return f"{name}({', '.join(args)})"
+    if name == "MultiControlledX":
+        return f"MultiControlledX({list(op.controls)}, {op.wires[0]}, {list(op.control_values)})"
+    base = format_operation(Operation(op.gate, op.wires, op.params))
+    if all(op.control_values):
+        return f"ctrl({base}, {list(op.controls)})"
+    return f"ctrl({base}, {list(op.controls)}, {list(op.control_values)})"
+
+
+class Circuit:
+    """A quantum circuit on ``n_wires`` qubits, built by appending operations.
+
+    Parameters
+    ----------
+    n_wires
+        Number of qubits (wires ``0 … n_wires-1``).
+    operations
+        Optional initial operations, validated as if appended one by one.
+
+    Raises
+    ------
+    ValueError
+        If an operation uses a wire outside the circuit.
+    """
+
+    __slots__ = ("_n_wires", "_ops")
+    __hash__ = None  # type: ignore[assignment]  # mutable, so unhashable
+
+    def __init__(self, n_wires: int, operations: Iterable[Operation] = ()) -> None:
+        self._n_wires = validate_n_wires(n_wires)
+        self._ops: list[Operation] = []
+        self.extend(operations)
+
+    # ------------------------------------------------------------------- core
+
+    @property
+    def n_wires(self) -> int:
+        """Number of qubits."""
+        return self._n_wires
+
+    @property
+    def operations(self) -> tuple[Operation, ...]:
+        """Immutable snapshot of the operations, in order."""
+        return tuple(self._ops)
+
+    def append(self, op: Operation) -> Self:
+        """Append one operation and return the circuit, for chaining.
+
+        Raises
+        ------
+        TypeError
+            If ``op`` isn't an :class:`~ketjet.operations.Operation`.
+        ValueError
+            If ``op`` uses a wire outside ``0 … n_wires-1``.
+        """
+        if not isinstance(op, Operation):
+            raise TypeError(f"Expected an Operation, got {type(op).__name__}.")
+        out_of_range = [w for w in op.all_wires if w >= self._n_wires]
+        if out_of_range:
+            raise ValueError(
+                f"{format_operation(op)} uses wire(s) {out_of_range}, but the circuit has "
+                f"{self._n_wires} wire(s)."
+            )
+        self._ops.append(op)
+        return self
+
+    def extend(self, operations: Iterable[Operation]) -> Self:
+        """Append several operations in order and return the circuit."""
+        for op in operations:
+            self.append(op)
+        return self
+
+    def copy(self) -> "Circuit":
+        """Return an independent copy (operations are immutable, so this is cheap)."""
+        return Circuit(self._n_wires, self._ops)
+
+    def inverse(self) -> "Circuit":
+        """Return the inverse circuit: inverted operations in reverse order."""
+        return Circuit(self._n_wires, (op.inverse() for op in reversed(self._ops)))
+
+    def __len__(self) -> int:
+        """Return the number of operations."""
+        return len(self._ops)
+
+    def __iter__(self) -> Iterator[Operation]:
+        """Iterate over the operations in order."""
+        return iter(tuple(self._ops))
+
+    def __eq__(self, other: object) -> bool:
+        """Circuits are equal when they have the same wire count and operations."""
+        if not isinstance(other, Circuit):
+            return NotImplemented
+        return self._n_wires == other._n_wires and self._ops == other._ops
+
+    def __repr__(self) -> str:
+        """Compact one-line representation."""
+        body = ", ".join(format_operation(op) for op in self._ops)
+        return f"Circuit({self._n_wires}) [{body}]"
+
+    # ------------------------------------------------------------------- serialization
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize to a JSON-compatible dict (versioned format)."""
+
+        def param(p: ParamLike) -> Any:
+            return {"parameter": p.name} if isinstance(p, Parameter) else p
+
+        return {
+            "format": _FORMAT,
+            "version": _VERSION,
+            "n_wires": self._n_wires,
+            "operations": [
+                {
+                    "gate": op.gate,
+                    "wires": list(op.wires),
+                    "params": [param(p) for p in op.params],
+                    "controls": list(op.controls),
+                    "control_values": list(op.control_values),
+                }
+                for op in self._ops
+            ],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Circuit":
+        """Rebuild a circuit from :meth:`to_dict` output.
+
+        Raises
+        ------
+        ValueError
+            If the data isn't a ketjet circuit or uses an unsupported format version.
+        """
+        if data.get("format") != _FORMAT:
+            raise ValueError(f"Not a ketjet circuit (format={data.get('format')!r}).")
+        if data.get("version") != _VERSION:
+            raise ValueError(f"Unsupported circuit format version {data.get('version')!r}.")
+
+        def param(p: Any) -> ParamLike:
+            return Parameter(p["parameter"]) if isinstance(p, dict) else p
+
+        return cls(
+            data["n_wires"],
+            (
+                Operation(
+                    o["gate"],
+                    tuple(o["wires"]),
+                    tuple(param(p) for p in o["params"]),
+                    tuple(o["controls"]),
+                    tuple(o["control_values"]),
+                )
+                for o in data["operations"]
+            ),
+        )
+
+    def to_json(self) -> str:
+        """Serialize to a JSON string."""
+        return json.dumps(self.to_dict())
+
+    @classmethod
+    def from_json(cls, text: str) -> "Circuit":
+        """Rebuild a circuit from :meth:`to_json` output."""
+        return cls.from_dict(json.loads(text))
+
+    # ------------------------------------------------------------------- fluent gates
+
+    def i(self, wire: int) -> Self:
+        """Append an identity."""
+        return self.append(ops.I(wire))
+
+    def x(self, wire: int) -> Self:
+        """Append Pauli-X."""
+        return self.append(ops.X(wire))
+
+    def y(self, wire: int) -> Self:
+        """Append Pauli-Y."""
+        return self.append(ops.Y(wire))
+
+    def z(self, wire: int) -> Self:
+        """Append Pauli-Z."""
+        return self.append(ops.Z(wire))
+
+    def h(self, wire: int) -> Self:
+        """Append a Hadamard."""
+        return self.append(ops.H(wire))
+
+    def s(self, wire: int) -> Self:
+        """Append S."""
+        return self.append(ops.S(wire))
+
+    def sdg(self, wire: int) -> Self:
+        """Append S†."""
+        return self.append(ops.Sdg(wire))
+
+    def t(self, wire: int) -> Self:
+        """Append T."""
+        return self.append(ops.T(wire))
+
+    def tdg(self, wire: int) -> Self:
+        """Append T†."""
+        return self.append(ops.Tdg(wire))
+
+    def sx(self, wire: int) -> Self:
+        """Append √X."""
+        return self.append(ops.SX(wire))
+
+    def rx(self, theta: ParamLike, wire: int) -> Self:
+        """Append an X rotation."""
+        return self.append(ops.RX(theta, wire))
+
+    def ry(self, theta: ParamLike, wire: int) -> Self:
+        """Append a Y rotation."""
+        return self.append(ops.RY(theta, wire))
+
+    def rz(self, theta: ParamLike, wire: int) -> Self:
+        """Append a Z rotation."""
+        return self.append(ops.RZ(theta, wire))
+
+    def phase(self, phi: ParamLike, wire: int) -> Self:
+        """Append a phase shift."""
+        return self.append(ops.PhaseShift(phi, wire))
+
+    def rot(self, phi: ParamLike, theta: ParamLike, omega: ParamLike, wire: int) -> Self:
+        """Append a general rotation ``RZ(ω) RY(θ) RZ(φ)``."""
+        return self.append(ops.Rot(phi, theta, omega, wire))
+
+    def u3(self, theta: ParamLike, phi: ParamLike, delta: ParamLike, wire: int) -> Self:
+        """Append a U3 gate."""
+        return self.append(ops.U3(theta, phi, delta, wire))
+
+    def swap(self, wire0: int, wire1: int) -> Self:
+        """Append SWAP."""
+        return self.append(ops.SWAP(wire0, wire1))
+
+    def iswap(self, wire0: int, wire1: int) -> Self:
+        """Append iSWAP."""
+        return self.append(ops.ISWAP(wire0, wire1))
+
+    def cnot(self, control: int, target: int) -> Self:
+        """Append CNOT."""
+        return self.append(ops.CNOT(control, target))
+
+    def cy(self, control: int, target: int) -> Self:
+        """Append controlled-Y."""
+        return self.append(ops.CY(control, target))
+
+    def cz(self, control: int, target: int) -> Self:
+        """Append controlled-Z."""
+        return self.append(ops.CZ(control, target))
+
+    def crx(self, theta: ParamLike, control: int, target: int) -> Self:
+        """Append a controlled X rotation."""
+        return self.append(ops.CRX(theta, control, target))
+
+    def cry(self, theta: ParamLike, control: int, target: int) -> Self:
+        """Append a controlled Y rotation."""
+        return self.append(ops.CRY(theta, control, target))
+
+    def crz(self, theta: ParamLike, control: int, target: int) -> Self:
+        """Append a controlled Z rotation."""
+        return self.append(ops.CRZ(theta, control, target))
+
+    def toffoli(self, control0: int, control1: int, target: int) -> Self:
+        """Append a Toffoli (CCNOT)."""
+        return self.append(ops.Toffoli(control0, control1, target))
+
+    def cswap(self, control: int, wire0: int, wire1: int) -> Self:
+        """Append a controlled SWAP (Fredkin)."""
+        return self.append(ops.CSWAP(control, wire0, wire1))
+
+    def mcx(
+        self, controls: Sequence[int], target: int, control_values: Sequence[bool] = ()
+    ) -> Self:
+        """Append a multi-controlled X."""
+        return self.append(ops.MultiControlledX(controls, target, control_values))
