@@ -5,6 +5,7 @@ import numpy as np
 from ketjet import Circuit
 from ketjet import operations as ops
 from ketjet.observables import Observable, X, Y, Z
+from ketjet.operations import Parameter
 
 
 def qft(n: int, basis_state: int) -> Circuit:
@@ -44,3 +45,29 @@ def observables(n: int) -> dict[str, Observable]:
 
 
 CIRCUITS = {"qft4_0110": qft(4, 0b0110), "qft5_10011": qft(5, 0b10011), "ghz5": ghz(5)}
+
+
+def gradient_circuit() -> tuple[Circuit, dict[str, float]]:
+    """Three shared symbols over plain, controlled and multi-parameter gates, with fixed values.
+
+    Every symbol appears in several slots (the chain rule), including controlled rotations (the
+    four-term shift rule) and gates after an entangler.
+    """
+    a, b, c = Parameter("a"), Parameter("b"), Parameter("c")
+    circuit = (
+        Circuit(3)
+        .h(0)
+        .ry(a, 1)
+        .crx(b, 0, 1)
+        .rot(a, c, 0.3, 2)
+        .cnot(1, 2)
+        .crz(c, 2, 0)
+        .phase(b, 1)
+        .u3(0.2, a, c, 0)
+        .iswap(0, 2)
+        .cry(b, 1, 2)
+    )
+    return circuit, {"a": 0.37, "b": -1.21, "c": 2.05}
+
+
+GRADIENT_CIRCUITS = {"gradient3": gradient_circuit()}

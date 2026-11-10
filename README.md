@@ -8,7 +8,8 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 [![Type checked: mypy strict](https://img.shields.io/badge/types-mypy%20strict-informational)](pyproject.toml)
 
-> **Status: pre-release (Sprint 0, Foundations).** The first usable release, v0.1.0, is planned for the end of Sprint 4.
+> **Status: pre-release (Sprint 3 of 16 done).** Circuits, measurements and exact gradients work on the NumPy reference
+> backend today. The first release, v0.1.0, with the PennyLane device, is planned for the end of Sprint 4.
 > Follow progress on the [project board](https://github.com/users/hasanahmed77/projects/2).
 
 ## The problem
@@ -20,6 +21,30 @@ means simulating it thousands of times and computing gradients each time. Resear
 - **differentiable**, with memory-efficient gradients for deep circuits,
 - **batched**, so many circuits or parameter sets run as one computation,
 - **trustworthy**: verified against established tools, with honest performance numbers.
+
+## What works today
+
+Exact gradients three ways, all checked against PennyLane. The default, adjoint, uses memory independent of
+circuit depth:
+
+```python
+import ketjet as kj
+from ketjet import gradients
+from ketjet.observables import X, Z
+from ketjet.operations import Parameter
+
+a, b = Parameter("a"), Parameter("b")
+circuit = kj.Circuit(2).ry(a, 0).cnot(0, 1).rx(b, 1)
+H = Z(0) @ Z(1) + 0.5 * X(0) @ X(1)
+
+values = {"a": 0.3, "b": 0.8}
+
+gradients.grad(circuit, H, values)                            # array([ 0.477668, -0.717356]): adjoint
+gradients.grad(circuit, H, values, method="parameter-shift")  # the same, hardware-compatible
+```
+
+The [H₂ example](https://hasanahmed77.github.io/high-performance-differentiable-quantum-simulator/examples/vqe-h2/)
+finds the molecule's exact ground-state energy with a variational circuit and gradient descent.
 
 ## Design
 

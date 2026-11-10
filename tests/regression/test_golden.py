@@ -1,8 +1,8 @@
 """Regression tests: canonical circuits keep producing their pinned, cross-checked outputs.
 
 Golden files are produced by ``generate_golden.py``, which verifies every value against
-PennyLane's default.qubit before writing it. A failure here means a change altered a known-good
-answer.
+PennyLane's default.qubit (for gradients, its backprop) before writing it. A failure here means a
+change altered a known-good answer.
 """
 
 import json
@@ -13,8 +13,9 @@ import numpy as np
 import pytest
 
 from ketjet import Circuit
-from tests.regression.circuits import CIRCUITS, observables
-from tests.tolerances import assert_close
+from ketjet.gradients import Method, jacobian
+from tests.regression.circuits import CIRCUITS, GRADIENT_CIRCUITS, observables
+from tests.tolerances import GRADIENT_FD, GRADIENT_FD_COMPLEX64, assert_close
 
 GOLDEN = Path(__file__).parent / "golden"
 
@@ -54,3 +55,29 @@ def test_ghz_has_only_the_two_extreme_outcomes() -> None:
     p = CIRCUITS["ghz5"].probs()
     assert_close(p[[0, -1]], [0.5, 0.5], np.complex128)
     assert_close(p[1:-1], np.zeros(30), np.complex128)
+
+
+@pytest.mark.parametrize("name", sorted(GRADIENT_CIRCUITS))
+def test_golden_gradient_definition_is_unchanged(name: str) -> None:
+    golden = load(name)
+    circuit, values = GRADIENT_CIRCUITS[name]
+    assert Circuit.from_dict(golden["circuit"]) == circuit
+    assert golden["values"] == values
+    assert golden["parameters"] == [p.name for p in circuit.parameters]
+
+
+@pytest.mark.parametrize("dtype", [np.complex128, np.complex64])
+@pytest.mark.parametrize("method", ["adjoint", "parameter-shift", "finite-diff"])
+@pytest.mark.parametrize("name", sorted(GRADIENT_CIRCUITS))
+def test_golden_gradient(name: str, method: Method, dtype: Any) -> None:
+    """Every method reproduces the pinned Jacobian, cross-checked against PennyLane backprop."""
+    golden = load(name)
+    circuit = Circuit.from_dict(golden["circuit"])
+    named = observables(circuit.n_wires)
+    jac = jacobian(circuit, list(named.values()), golden["values"], method=method, dtype=dtype)
+    expected = np.array([golden["jacobian"][key] for key in named])
+    if method == "finite-diff":
+        tol = GRADIENT_FD if dtype == np.complex128 else GRADIENT_FD_COMPLEX64
+        np.testing.assert_allclose(jac, expected, atol=tol.atol, rtol=tol.rtol)
+    else:
+        assert_close(jac, expected, dtype)

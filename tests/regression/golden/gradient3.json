@@ -1,0 +1,184 @@
+{
+ "circuit": {
+  "format": "ketjet.circuit",
+  "version": 1,
+  "n_wires": 3,
+  "operations": [
+   {
+    "gate": "H",
+    "wires": [
+     0
+    ],
+    "params": [],
+    "controls": [],
+    "control_values": []
+   },
+   {
+    "gate": "RY",
+    "wires": [
+     1
+    ],
+    "params": [
+     {
+      "parameter": "a"
+     }
+    ],
+    "controls": [],
+    "control_values": []
+   },
+   {
+    "gate": "RX",
+    "wires": [
+     1
+    ],
+    "params": [
+     {
+      "parameter": "b"
+     }
+    ],
+    "controls": [
+     0
+    ],
+    "control_values": [
+     true
+    ]
+   },
+   {
+    "gate": "Rot",
+    "wires": [
+     2
+    ],
+    "params": [
+     {
+      "parameter": "a"
+     },
+     {
+      "parameter": "c"
+     },
+     0.3
+    ],
+    "controls": [],
+    "control_values": []
+   },
+   {
+    "gate": "X",
+    "wires": [
+     2
+    ],
+    "params": [],
+    "controls": [
+     1
+    ],
+    "control_values": [
+     true
+    ]
+   },
+   {
+    "gate": "RZ",
+    "wires": [
+     0
+    ],
+    "params": [
+     {
+      "parameter": "c"
+     }
+    ],
+    "controls": [
+     2
+    ],
+    "control_values": [
+     true
+    ]
+   },
+   {
+    "gate": "PhaseShift",
+    "wires": [
+     1
+    ],
+    "params": [
+     {
+      "parameter": "b"
+     }
+    ],
+    "controls": [],
+    "control_values": []
+   },
+   {
+    "gate": "U3",
+    "wires": [
+     0
+    ],
+    "params": [
+     0.2,
+     {
+      "parameter": "a"
+     },
+     {
+      "parameter": "c"
+     }
+    ],
+    "controls": [],
+    "control_values": []
+   },
+   {
+    "gate": "ISWAP",
+    "wires": [
+     0,
+     2
+    ],
+    "params": [],
+    "controls": [],
+    "control_values": []
+   },
+   {
+    "gate": "RY",
+    "wires": [
+     2
+    ],
+    "params": [
+     {
+      "parameter": "b"
+     }
+    ],
+    "controls": [
+     1
+    ],
+    "control_values": [
+     true
+    ]
+   }
+  ]
+ },
+ "values": {
+  "a": 0.37,
+  "b": -1.21,
+  "c": 2.05
+ },
+ "parameters": [
+  "a",
+  "b",
+  "c"
+ ],
+ "jacobian": {
+  "Z0": [
+   0.1127951392031642,
+   -0.20109694269350364,
+   -0.5596847299089293
+  ],
+  "X0": [
+   0.03106743849220425,
+   0.04440514558094561,
+   -0.08258035364262872
+  ],
+  "Z_all": [
+   -0.12665007959409577,
+   0.16875523120034774,
+   0.06344277837385698
+  ],
+  "hamiltonian": [
+   0.34517120777856636,
+   -0.11337988267110202,
+   -0.23353172581994325
+  ]
+ }
+}
