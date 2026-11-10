@@ -18,6 +18,9 @@ Methods
     Central differences, :math:`[f(x+h) - f(x-h)] / 2h`. Approximate: a test oracle and fallback,
     never the default (ADR-0004 D7).
 
+:func:`vjp` contracts the Jacobian with a cotangent, which is what reverse-mode frameworks ask
+for. With ``"adjoint"`` it is one backward pass however many observables there are (ADR-0004 D6).
+
 Examples
 --------
 >>> import numpy as np
@@ -43,11 +46,20 @@ from ketjet.backends.base import Backend
 from ketjet.backends.numpy_backend import NumPyBackend
 from ketjet.circuit import Circuit
 from ketjet.measurements import Seed
-from ketjet.observables import Observable
+from ketjet.observables import Observable, Sum
 from ketjet.operations import Operation, Parameter
 from ketjet.statevector import DTypeLike, as_complex_dtype
 
-__all__ = ["GradientOptions", "Measurement", "Method", "Values", "grad", "jacobian", "shift_rule"]
+__all__ = [
+    "GradientOptions",
+    "Measurement",
+    "Method",
+    "Values",
+    "grad",
+    "jacobian",
+    "shift_rule",
+    "vjp",
+]
 
 Method = Literal["adjoint", "parameter-shift", "finite-diff"]
 """A differentiation method name."""
@@ -227,7 +239,7 @@ def _finite_diff(problem: _Problem, evaluate: _Evaluate, n_outputs: int, step: f
 
 
 class GradientOptions(TypedDict, total=False):
-    """Keyword options shared by :func:`jacobian` and :func:`grad`."""
+    """Keyword options shared by :func:`jacobian`, :func:`grad` and :func:`vjp`."""
 
     method: Method
     measurement: Measurement
@@ -359,3 +371,75 @@ def grad(
     """
     result: npt.NDArray[np.float64] = jacobian(circuit, [observable], values, **options)[0]
     return result
+
+
+def _check_cotangent(cotangent: npt.ArrayLike, n_outputs: int) -> npt.NDArray[np.float64]:
+    v = np.asarray(cotangent)
+    if v.dtype.kind not in "biuf":
+        raise TypeError(f"The cotangent must be real, got dtype {v.dtype}.")
+    if v.shape != (n_outputs,):
+        raise ValueError(
+            f"The cotangent must have shape ({n_outputs},), one entry per observable, "
+            f"got {v.shape}."
+        )
+    real = v.astype(np.float64)
+    if not np.isfinite(real).all():
+        raise ValueError("The cotangent must be finite.")
+    return real
+
+
+def vjp(
+    circuit: Circuit,
+    observables: Sequence[Observable],
+    values: Values,
+    cotangent: npt.ArrayLike,
+    **options: Unpack[GradientOptions],
+) -> npt.NDArray[np.float64]:
+    r"""Return the vector-Jacobian product :math:`v^\top J`, shape ``(P,)``.
+
+    That is :math:`\sum_m v_m \, \partial \langle O_m \rangle / \partial \theta_p`, which equals
+    ``jacobian(circuit, observables, values, **options).T @ cotangent``. With
+    ``method="adjoint"`` it is the gradient of the single observable :math:`\sum_m v_m O_m`:
+    one backward pass, whatever the number of observables (ADR-0004 D6). Other methods compute
+    the Jacobian and contract it.
+
+    Parameters
+    ----------
+    circuit, observables, values
+        As for :func:`jacobian`.
+    cotangent
+        Real vector :math:`v` with one entry per observable.
+    **options
+        As for :func:`jacobian`.
+
+    Returns
+    -------
+    numpy.ndarray
+        ``float64`` array of shape ``(len(circuit.parameters),)``.
+
+    Raises
+    ------
+    TypeError
+        If the cotangent isn't real.
+    ValueError
+        If the cotangent's shape doesn't match the observables or it isn't finite, or for any
+        reason :func:`jacobian` raises.
+
+    Examples
+    --------
+    >>> from ketjet import Circuit
+    >>> from ketjet.observables import Z
+    >>> from ketjet.operations import Parameter
+    >>> a, b = Parameter("a"), Parameter("b")
+    >>> c = Circuit(2).rx(a, 0).ry(b, 1)
+    >>> vjp(c, [Z(0), Z(1)], {"a": 0.5, "b": 1.0}, [2.0, -1.0]).round(6)
+    array([-0.958851,  0.841471])
+    """
+    observables = list(observables)
+    v = _check_cotangent(cotangent, len(observables))
+    method = options.get("method", "adjoint")
+    if method != "adjoint" or not observables:
+        result: npt.NDArray[np.float64] = jacobian(circuit, observables, values, **options).T @ v
+        return result
+    combined = Sum([(float(c), obs) for c, obs in zip(v, observables, strict=True)])
+    return grad(circuit, combined, values, **options)
