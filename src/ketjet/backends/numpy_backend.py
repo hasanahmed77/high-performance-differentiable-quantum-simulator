@@ -6,7 +6,7 @@ import numpy as np
 import numpy.typing as npt
 
 from ketjet import adjoint, measurements
-from ketjet.kernels import apply_matrix, n_wires_of
+from ketjet.kernels import apply_structured, n_wires_of
 from ketjet.measurements import Probabilities, Samples, Seed
 from ketjet.observables import Observable
 from ketjet.operations import Operation
@@ -28,7 +28,7 @@ class NumPyBackend:
     >>> from ketjet.operations import CNOT, H
     >>> backend = NumPyBackend()
     >>> bell = backend.apply_operations(backend.zero_state(2), [H(0), CNOT(0, 1)])
-    >>> backend.to_numpy(bell).round(3)
+    >>> (backend.to_numpy(bell) + 0.0).round(3)  # + 0.0 normalizes -0.0 across platforms
     array([0.707+0.j, 0.   +0.j, 0.   +0.j, 0.707+0.j])
     """
 
@@ -45,6 +45,8 @@ class NumPyBackend:
     def apply_operation(self, state: StateVector, op: Operation) -> StateVector:
         """Apply one operation, controls included, and return the new state.
 
+        Diagonal and permutation gates use the specialized kernels (QS-205).
+
         Raises
         ------
         ValueError
@@ -56,7 +58,13 @@ class NumPyBackend:
             raise ValueError(
                 f"{op.gate} uses wire(s) {out_of_range}, but the state has {n} qubit(s)."
             )
-        return apply_matrix(state, op.matrix(state.dtype), op.all_wires)
+        return apply_structured(
+            state,
+            op.matrix(state.dtype),
+            op.all_wires,
+            diagonal=op.is_diagonal,
+            permutation=op.is_permutation,
+        )
 
     def apply_operations(self, state: StateVector, ops: Iterable[Operation]) -> StateVector:
         """Apply operations in order and return the final state."""

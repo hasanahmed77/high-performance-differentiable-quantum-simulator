@@ -172,6 +172,16 @@ class Operation:
         return self.controls + self.wires
 
     @property
+    def is_diagonal(self) -> bool:
+        """``True`` if :meth:`matrix` is diagonal: controls keep a diagonal gate diagonal."""
+        return self.spec.is_diagonal
+
+    @property
+    def is_permutation(self) -> bool:
+        """``True`` if :meth:`matrix` is a phased permutation; controls preserve this too."""
+        return self.spec.is_permutation
+
+    @property
     def is_parametrized_symbolically(self) -> bool:
         """``True`` if any parameter is an unbound :class:`Parameter`."""
         return any(isinstance(p, Parameter) for p in self.params)
