@@ -224,6 +224,8 @@ the workflow, rather than by built-in project automations:
   implementation**.
 - **Versioning:** SemVer. Pre-1.0 minors may break the API, and every break is listed in the changelog.
 - **Changelog:** Keep-a-Changelog format, generated from towncrier news fragments, one per PR.
+- **ADR numbering:** ADRs are numbered in the order they're written (`docs/adr/NNNN-*.md`); backlog stories
+  don't reserve numbers.
 - **Design changes:** any change to a public API, the backend protocol, or the IR needs an ADR approved by the PO *before* implementation.
 
 ### 4.5 Development environments and compute
@@ -435,7 +437,7 @@ Tolerances live in one module (`tests/tolerances.py`) and are never loosened inl
 |---|---|---|---|---|
 | QS-401 | As a researcher, I want finite-difference gradients as a test reference | P0 | 2 | Central difference; used only in tests and as a fallback |
 | QS-402 | As a researcher, I want parameter-shift gradients, so gradients are exact and hardware-compatible | P0 | 3 | Matches finite difference; supports multi-term shift rules for controlled rotations |
-| QS-403 | ADR-0003: adjoint differentiation design (memory, supported ops, observables) | P0 | 2 | Approved |
+| QS-403 | ADR: adjoint differentiation design (memory, supported ops, observables) | P0 | 2 | Approved |
 | QS-404 | As a researcher, I want adjoint differentiation for expvals, so deep circuits differentiate with O(1) extra memory | P0 | 8 | Matches param-shift; memory test proves constant state copies vs depth |
 | QS-405 | As a researcher, I want a Jacobian for multiple observables in one adjoint pass | P1 | 3 | One backward pass per circuit, not per observable |
 | QS-406 | As a researcher, I want vector-Jacobian products (VJP), so the device composes with any autodiff framework | P0 | 3 | VJP matches J^T·v |
@@ -445,7 +447,7 @@ Tolerances live in one module (`tests/tolerances.py`) and are never loosened inl
 
 | ID | Story | Pri | Pts | Acceptance criteria |
 |---|---|---|---|---|
-| QS-501 | Spike: study PennyLane's `devices.Device` API, preprocessing and the test suite | P0 | 2 | Notes in `docs/adr/0004-pennylane-device.md` |
+| QS-501 | Spike: study PennyLane's `devices.Device` API, preprocessing and the test suite | P0 | 2 | Notes in an ADR for the PennyLane device |
 | QS-502 | As a PennyLane user, I want `qml.device("ketjet.qubit", wires=n)` via an entry point | P0 | 5 | Device registered through `pennylane.plugins`; QNodes execute |
 | QS-503 | As a PennyLane user, I want unsupported ops decomposed automatically | P0 | 3 | Preprocess transforms; unsupported ops give a clear error |
 | QS-504 | As a PennyLane user, I want `diff_method="adjoint"` and `"backprop"` to work | P0 | 5 | `compute_derivatives` / `compute_vjp` implemented; matches `default.qubit` |
@@ -457,7 +459,7 @@ Tolerances live in one module (`tests/tolerances.py`) and are never loosened inl
 
 | ID | Story | Pri | Pts | Acceptance criteria |
 |---|---|---|---|---|
-| QS-601 | ADR-0005: JAX backend design (pure functions, static wires, dtype handling) | P0 | 2 | Approved |
+| QS-601 | ADR: JAX backend design (pure functions, static wires, dtype handling) | P0 | 2 | Approved |
 | QS-602 | As a user, I want the JAX backend to pass the full cross-backend suite | P0 | 5 | All oracle tests pass |
 | QS-603 | As a user, I want circuits to be `jax.jit`-compiled, so repeated runs are fast | P0 | 3 | No retracing for the same structure (trace-count test) |
 | QS-604 | As a researcher, I want `jax.grad` through the simulator (backprop) | P0 | 3 | Matches adjoint and param-shift |
@@ -470,7 +472,7 @@ Tolerances live in one module (`tests/tolerances.py`) and are never loosened inl
 
 | ID | Story | Pri | Pts | Acceptance criteria |
 |---|---|---|---|---|
-| QS-701 | ADR-0006: native core (C++20, nanobind, scikit-build-core, memory ownership, threading) | P0 | 3 | Approved |
+| QS-701 | ADR: native core (C++20, nanobind, scikit-build-core, memory ownership, threading) | P0 | 3 | Approved |
 | QS-702 | As a maintainer, I want the CMake + scikit-build-core + nanobind build working on all OSes | P0 | 5 | Editable install builds the extension; CI builds on 3 OSes |
 | QS-703 | As a user, I want native 1- and 2-qubit gate kernels with zero-copy NumPy interop | P0 | 5 | Cross-backend suite passes; no copies (buffer-pointer test) |
 | QS-704 | As a user, I want OpenMP multithreading with a configurable thread count | P0 | 3 | Scales on benchmarks; deterministic results |
@@ -484,7 +486,7 @@ Tolerances live in one module (`tests/tolerances.py`) and are never loosened inl
 
 | ID | Story | Pri | Pts | Acceptance criteria |
 |---|---|---|---|---|
-| QS-801 | ADR-0007: fusion strategy (greedy, max-k qubits, which gates are excluded, parameter handling) | P0 | 2 | Approved |
+| QS-801 | ADR: fusion strategy (greedy, max-k qubits, which gates are excluded, parameter handling) | P0 | 2 | Approved |
 | QS-802 | As a developer, I want a compiler-pass framework over the IR | P0 | 3 | Passes are composable, typed and tested in isolation |
 | QS-803 | As a user, I want greedy gate fusion with a configurable max fused size k | P0 | 5 | Fused circuit equals the original (property test on random circuits) |
 | QS-804 | As a user, I want fusion to keep diagonal/permutation fast paths, not turn them into dense matrices | P0 | 3 | Policy tests; benchmarks show no regression |
@@ -496,7 +498,7 @@ Tolerances live in one module (`tests/tolerances.py`) and are never loosened inl
 
 | ID | Story | Pri | Pts | Acceptance criteria |
 |---|---|---|---|---|
-| QS-901 | ADR-0008: CUDA backend (kernel design, memory management, packaging strategy) | P0 | 2 | Approved |
+| QS-901 | ADR: CUDA backend (kernel design, memory management, packaging strategy) | P0 | 2 | Approved |
 | QS-902 | As a user, I want CUDA kernels for k-qubit dense, diagonal and permutation gates | P0 | 8 | Cross-backend suite passes on GPU |
 | QS-903 | As a user, I want GPU expvals and sampling without copying the state to the host | P0 | 5 | Only scalars/samples cross PCIe (profiler-verified) |
 | QS-904 | As a researcher, I want GPU adjoint differentiation | P1 | 5 | Matches CPU adjoint |
@@ -509,7 +511,7 @@ Tolerances live in one module (`tests/tolerances.py`) and are never loosened inl
 
 | ID | Story | Pri | Pts | Acceptance criteria |
 |---|---|---|---|---|
-| QS-1001 | ADR-0009: state partitioning (global vs local qubits, qubit-swap strategy) | P2 | 3 | Approved |
+| QS-1001 | ADR: state partitioning (global vs local qubits, qubit-swap strategy) | P2 | 3 | Approved |
 | QS-1002 | As a user, I want the statevector sharded across GPUs with `jax.sharding` | P2 | 8 | Matches single-device results; 1 more qubit per doubling of devices |
 | QS-1003 | As a developer, I want a communication-minimizing scheduler (reorder or swap qubits to reduce cross-device gates) | P2 | 8 | Fewer collectives than naive, measured |
 | QS-1004 | As the PO, I want measured 1 → 2 GPU scaling (Kaggle 2× T4) plus a communication-cost analysis from emulated 1/2/4/8-device runs | P2 | 3 | Plots in docs + write-up; measured and emulated results clearly labelled |
@@ -518,7 +520,7 @@ Tolerances live in one module (`tests/tolerances.py`) and are never loosened inl
 
 | ID | Story | Pri | Pts | Acceptance criteria |
 |---|---|---|---|---|
-| QS-1101 | ADR-0010: benchmark methodology (warmup, repeats, reported statistics, hardware disclosure) | P0 | 2 | Approved |
+| QS-1101 | ADR: benchmark methodology (warmup, repeats, reported statistics, hardware disclosure) | P0 | 2 | Approved |
 | QS-1102 | As the PO, I want a benchmark suite: single-gate throughput, QFT, random circuits, a VQE ansatz with gradients, batched QML | P0 | 5 | Scripts reproducible with one command; JSON results committed |
 | QS-1103 | As the PO, I want comparisons vs `default.qubit`, `lightning.qubit`, `lightning.gpu`, Qiskit Aer and Qulacs | P0 | 5 | Same circuits, same hardware; losses reported |
 | QS-1104 | As the PO, I want auto-generated plots (time vs qubits, speedup, gradient cost) | P0 | 3 | `make plots` regenerates every figure |
