@@ -9,7 +9,7 @@ Operations validate themselves on construction (ADR-0002 D7), so invalid operati
 backend.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from numbers import Real
 from typing import Any
@@ -214,6 +214,18 @@ class Operation:
         start = trigger * k
         full[start : start + k, start : start + k] = base
         return full
+
+    def bind(self, values: Mapping[str, float]) -> "Operation":
+        """Return a copy with symbolic parameters replaced by values from ``values`` (by name).
+
+        Symbols missing from ``values`` stay symbolic.
+        """
+        params = tuple(
+            values.get(p.name, p) if isinstance(p, Parameter) else p for p in self.params
+        )
+        if params == self.params:
+            return self
+        return Operation(self.gate, self.wires, params, self.controls, self.control_values)
 
     def inverse(self) -> "Operation":
         """The inverse operation (same wires and controls)."""
