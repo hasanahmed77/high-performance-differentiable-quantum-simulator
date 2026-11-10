@@ -11,9 +11,16 @@ from typing import Any
 import numpy as np
 import pennylane as qml
 
-from ketjet.gates import GATES
 from ketjet.observables import Hermitian, Observable, Pauli, Prod, Sum
 from ketjet.operations import Operation
+from tests.random_circuits import random_circuit
+
+__all__ = [
+    "random_circuit",
+    "run_default_qubit",
+    "to_pennylane",
+    "to_pennylane_observable",
+]
 
 _PL_BASE: dict[str, Callable[..., Any]] = {
     "I": lambda w, p: qml.Identity(w[0]),
@@ -81,19 +88,3 @@ def run_default_qubit(
         return measurement()
 
     return run()
-
-
-def random_circuit(n_wires: int, depth: int, rng: np.random.Generator) -> list[Operation]:
-    """Random operations over every registry gate, with random controls and control values."""
-    names = sorted(GATES)
-    circuit = []
-    for _ in range(depth):
-        spec = GATES[names[rng.integers(len(names))]]
-        n_ctrl = int(rng.integers(0, min(2, n_wires - spec.num_wires) + 1))
-        wires = [int(w) for w in rng.permutation(n_wires)[: spec.num_wires + n_ctrl]]
-        params = tuple(float(x) for x in rng.uniform(-np.pi, np.pi, spec.num_params))
-        values = tuple(bool(v) for v in rng.integers(0, 2, n_ctrl))
-        circuit.append(
-            Operation(spec.name, tuple(wires[n_ctrl:]), params, tuple(wires[:n_ctrl]), values)
-        )
-    return circuit

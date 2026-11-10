@@ -1,8 +1,10 @@
-"""Finite-difference gradients equal PennyLane's backprop gradients (QS-401, ADR-0004).
+"""Our gradients equal PennyLane's backprop gradients (QS-401, QS-402, ADR-0004).
 
 PennyLane differentiates its own native gates by automatic differentiation, which is independent of
-both our gates and our finite differences. Every random-circuit parameter becomes its own symbol,
-except that some are deliberately shared, to exercise the chain rule over slots.
+our gates, our shift rules and our finite differences. Exact methods must agree at the standard
+complex128 tolerance; finite differences at the gradient tolerance. Every random-circuit
+parameter becomes its own symbol, except that some are deliberately shared, to exercise the chain
+rule over slots.
 """
 
 from typing import Any
@@ -11,10 +13,10 @@ import numpy as np
 import pytest
 
 from ketjet import Circuit
-from ketjet.gradients import jacobian
+from ketjet.gradients import Method, jacobian
 from ketjet.observables import Hermitian, Observable, X, Y, Z
-from ketjet.operations import Operation, Parameter
-from tests.tolerances import GRADIENT_FD
+from tests.random_circuits import symbolize
+from tests.tolerances import GRADIENT_FD, TOLERANCES, Tolerance
 
 qml = pytest.importorskip("pennylane")
 pytestmark = [
@@ -30,33 +32,6 @@ from tests.pennylane_support import (  # noqa: E402
 )
 
 
-def _symbolize(
-    circuit: list[Operation], rng: np.random.Generator
-) -> tuple[list[Operation], dict[str, float], list[int]]:
-    """Replace every parameter by a symbol; about a quarter of slots reuse an earlier symbol.
-
-    Returns the symbolic operations, the symbol values, and for each slot (in order) the index of
-    its symbol in first-appearance order.
-    """
-    names: list[str] = []
-    values: dict[str, float] = {}
-    slot_symbol: list[int] = []
-    symbolic = []
-    for op in circuit:
-        params = []
-        for p in op.params:
-            if names and rng.random() < 0.25:
-                k = int(rng.integers(len(names)))
-            else:
-                k = len(names)
-                names.append(f"p{k}")
-                values[f"p{k}"] = float(p)  # type: ignore[arg-type]  # numeric before symbolizing
-            slot_symbol.append(k)
-            params.append(Parameter(names[k]))
-        symbolic.append(Operation(op.gate, op.wires, tuple(params), op.controls, op.control_values))
-    return symbolic, values, slot_symbol
-
-
 def _random_observables(n_wires: int, rng: np.random.Generator) -> list[Observable]:
     m = rng.normal(size=(2, 2)) + 1j * rng.normal(size=(2, 2))
     w = [int(x) for x in rng.permutation(n_wires)]
@@ -68,14 +43,21 @@ def _random_observables(n_wires: int, rng: np.random.Generator) -> list[Observab
     ]
 
 
+METHODS: dict[Method, Tolerance] = {
+    "parameter-shift": TOLERANCES[np.dtype(np.complex128)],
+    "finite-diff": GRADIENT_FD,
+}
+
+
+@pytest.mark.parametrize("method", list(METHODS))
 @pytest.mark.parametrize("seed", range(15))
-def test_finite_diff_matches_pennylane_backprop(seed: int) -> None:
+def test_gradients_match_pennylane_backprop(seed: int, method: Method) -> None:
     rng = np.random.default_rng(1000 + seed)
     n_wires = int(rng.integers(2, 5))
-    ops, values, slot_symbol = _symbolize(random_circuit(n_wires, depth=12, rng=rng), rng)
+    ops, values, slot_symbol = symbolize(random_circuit(n_wires, depth=12, rng=rng), rng)
     circuit = Circuit(n_wires, ops)
     observables = _random_observables(n_wires, rng)
-    ours = jacobian(circuit, observables, values, method="finite-diff")
+    ours = jacobian(circuit, observables, values, method=method)
 
     names = [p.name for p in circuit.parameters]
     theta = qml.numpy.array([values[n] for n in names], requires_grad=True)
@@ -94,4 +76,5 @@ def test_finite_diff_matches_pennylane_backprop(seed: int) -> None:
         assert ours.shape == (len(observables), 0)
         return
     theirs = qml.jacobian(lambda x: qml.math.stack(run(x)))(theta)
-    np.testing.assert_allclose(ours, theirs, atol=GRADIENT_FD.atol, rtol=GRADIENT_FD.rtol)
+    tol = METHODS[method]
+    np.testing.assert_allclose(ours, theirs, atol=tol.atol, rtol=tol.rtol)

@@ -364,7 +364,7 @@ class Circuit:
         observable: Observable,
         values: "gradients.Values",
         *,
-        method: "gradients.Method" = "finite-diff",
+        method: "gradients.Method" = "parameter-shift",
         backend: Backend[Any] | None = None,
         dtype: DTypeLike = "complex128",
     ) -> "npt.NDArray[np.float64]":
