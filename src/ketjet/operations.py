@@ -224,8 +224,9 @@ class Operation:
 
         Examples
         --------
-        >>> CRZ(0.0, 0, 1).derivative_matrix(0).round(6).diagonal()
-        array([0.+0.j , 0.+0.j , 0.-0.5j, 0.+0.5j])
+        >>> d = CRZ(0.0, 0, 1).derivative_matrix(0)
+        >>> (d.diagonal().imag + 0.0).tolist()  # + 0.0 normalizes -0.0 across platforms
+        [0.0, 0.0, -0.5, 0.5]
         """
         base = self.spec.derivative(self._numeric_params(), param_index, dtype)
         n_ctrl = len(self.controls)
