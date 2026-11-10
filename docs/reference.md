@@ -45,3 +45,5 @@ The reference is generated from the docstrings in the source code, so it always 
 ## Gradients
 
 ::: ketjet.gradients
+
+::: ketjet.adjoint

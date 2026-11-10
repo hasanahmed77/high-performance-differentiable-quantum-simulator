@@ -31,6 +31,7 @@ Matrix = npt.NDArray[np.complexfloating[Any, Any]]
 
 _MatrixFn = Callable[[tuple[float, ...]], npt.NDArray[np.complex128]]
 _InverseFn = Callable[[tuple[float, ...]], tuple[str, tuple[float, ...]]]
+_DerivativeFn = Callable[[tuple[float, ...], int], npt.NDArray[np.complex128]]
 
 _DECIMALS: Final = 12  # eigenvalue differences closer than 1e-12 are the same frequency
 
@@ -67,7 +68,7 @@ def frequencies(eigvals: tuple[float, ...], *, controlled: bool = False) -> tupl
 
 @dataclass(frozen=True, slots=True)
 class GateSpec:
-    """Immutable description of a base gate.
+    r"""Immutable description of a base gate.
 
     Attributes
     ----------
@@ -91,12 +92,15 @@ class GateSpec:
     generator_eigvals
         For each parameter, the eigenvalues of its generator (see the module docstring).
         Required for parametrized gates; empty otherwise.
+    derivative_fn
+        Maps ``(params, j)`` to the analytic :math:`\partial U / \partial x_j` (complex128), used
+        by adjoint differentiation (ADR-0004 D3). Required for parametrized gates.
 
     Raises
     ------
     ValueError
-        If ``generator_eigvals`` doesn't have one entry per parameter, or gives non-equidistant
-        frequencies with or without a control.
+        If ``generator_eigvals`` doesn't have one entry per parameter, gives non-equidistant
+        frequencies with or without a control, or a parametrized gate has no ``derivative_fn``.
     """
 
     name: str
@@ -108,9 +112,12 @@ class GateSpec:
     is_permutation: bool = False
     is_self_inverse: bool = False
     generator_eigvals: tuple[tuple[float, ...], ...] = ()
+    derivative_fn: _DerivativeFn | None = None
 
     def __post_init__(self) -> None:
-        """Check the declared spectra, so a wrong shift rule can't be built later."""
+        """Check the differentiation data, so a wrong gradient can't be built later."""
+        if self.num_params and self.derivative_fn is None:
+            raise ValueError(f"{self.name} is parametrized but has no derivative_fn.")
         if len(self.generator_eigvals) != self.num_params:
             raise ValueError(
                 f"{self.name} has {self.num_params} parameter(s) but declares "
@@ -143,6 +150,30 @@ class GateSpec:
                 f"{self.name} takes {self.num_params} parameter(s), got {len(params)}."
             )
         return self.matrix_fn(params).astype(as_complex_dtype(dtype), copy=False)
+
+    def derivative(
+        self, params: tuple[float, ...], param_index: int, dtype: DTypeLike = np.complex128
+    ) -> Matrix:
+        r"""Return :math:`\partial U / \partial x_j` at ``params`` (not unitary).
+
+        Raises
+        ------
+        ValueError
+            If the gate has no parameter ``param_index`` or the number of parameters is wrong.
+
+        Examples
+        --------
+        >>> GATES["PhaseShift"].derivative((0.0,), 0).round(6)
+        array([[0.+0.j, 0.+0.j],
+               [0.+0.j, 0.+1.j]])
+        """
+        if len(params) != self.num_params:
+            raise ValueError(
+                f"{self.name} takes {self.num_params} parameter(s), got {len(params)}."
+            )
+        if not 0 <= param_index < self.num_params or self.derivative_fn is None:
+            raise ValueError(f"{self.name} has no parameter {param_index}.")
+        return self.derivative_fn(params, param_index).astype(as_complex_dtype(dtype), copy=False)
 
     def inverse(self, params: tuple[float, ...] = ()) -> tuple[str, tuple[float, ...]]:
         """Return ``(gate name, parameters)`` of the inverse gate."""
@@ -203,6 +234,50 @@ def _u3(params: tuple[float, ...]) -> npt.NDArray[np.complex128]:
     )
 
 
+# --------------------------------------------------------------------------- derivatives
+# Each returns dU/dx_j (ADR-0004 D3); tests check them against central differences of matrix_fn.
+
+
+def _drx(params: tuple[float, ...], _j: int) -> npt.NDArray[np.complex128]:
+    c, s = np.cos(params[0] / 2), np.sin(params[0] / 2)
+    return 0.5 * np.array([[-s, -1j * c], [-1j * c, -s]], dtype=np.complex128)
+
+
+def _dry(params: tuple[float, ...], _j: int) -> npt.NDArray[np.complex128]:
+    c, s = np.cos(params[0] / 2), np.sin(params[0] / 2)
+    return 0.5 * np.array([[-s, -c], [c, -s]], dtype=np.complex128)
+
+
+def _drz(params: tuple[float, ...], _j: int) -> npt.NDArray[np.complex128]:
+    p = np.exp(-0.5j * params[0])
+    return 0.5j * np.array([[-p, 0], [0, np.conj(p)]], dtype=np.complex128)
+
+
+def _dphase(params: tuple[float, ...], _j: int) -> npt.NDArray[np.complex128]:
+    return np.array([[0, 0], [0, 1j * np.exp(1j * params[0])]], dtype=np.complex128)
+
+
+def _drot(params: tuple[float, ...], j: int) -> npt.NDArray[np.complex128]:
+    phi, theta, omega = params
+    factors = [_rz((omega,)), _ry((theta,)), _rz((phi,))]  # matrix order: RZ(ω) RY(θ) RZ(φ)
+    position = 2 - j  # φ is the rightmost factor
+    factors[position] = (_drz, _dry, _drz)[position]((params[j],), 0)
+    return factors[0] @ factors[1] @ factors[2]
+
+
+def _du3(params: tuple[float, ...], j: int) -> npt.NDArray[np.complex128]:
+    theta, phi, delta = params
+    c, s = np.cos(theta / 2), np.sin(theta / 2)
+    ep, ed, epd = np.exp(1j * phi), np.exp(1j * delta), np.exp(1j * (phi + delta))
+    if j == 0:
+        rows = [[-s / 2, -ed * c / 2], [ep * c / 2, -epd * s / 2]]
+    elif j == 1:
+        rows = [[0, 0], [1j * ep * s, 1j * epd * c]]
+    else:
+        rows = [[0, -1j * ed * s], [0, 1j * epd * c]]
+    return np.array(rows, dtype=np.complex128)
+
+
 _SQRT1_2 = 1 / np.sqrt(2)
 _SX = 0.5 * np.array([[1 + 1j, 1 - 1j], [1 - 1j, 1 + 1j]])
 _T = np.exp(0.25j * np.pi)
@@ -234,16 +309,18 @@ _SPECS: tuple[GateSpec, ...] = (
     # --- parametric single-qubit gates
     # Generators: RX, RY, RZ have P/2 (eigenvalues ±1/2); PhaseShift has |1⟩⟨1| (0, 1). Rot is
     # three rotations. U3 = diag(1, e^{iφ}) RY(θ) diag(1, e^{iδ}), so φ and δ are phase shifts.
-    GateSpec("RX", 1, 1, _rx, _negate("RX"), generator_eigvals=(_PAULI_HALF,)),
-    GateSpec("RY", 1, 1, _ry, _negate("RY"), generator_eigvals=(_PAULI_HALF,)),
+    GateSpec("RX", 1, 1, _rx, _negate("RX"), generator_eigvals=(_PAULI_HALF,),
+             derivative_fn=_drx),
+    GateSpec("RY", 1, 1, _ry, _negate("RY"), generator_eigvals=(_PAULI_HALF,),
+             derivative_fn=_dry),
     GateSpec("RZ", 1, 1, _rz, _negate("RZ"), is_diagonal=True,
-             generator_eigvals=(_PAULI_HALF,)),
+             generator_eigvals=(_PAULI_HALF,), derivative_fn=_drz),
     GateSpec("PhaseShift", 1, 1, _phase, _negate("PhaseShift"), is_diagonal=True,
-             generator_eigvals=(_PROJECTOR,)),
+             generator_eigvals=(_PROJECTOR,), derivative_fn=_dphase),
     GateSpec("Rot", 1, 3, _rot, lambda p: ("Rot", (-p[2], -p[1], -p[0])),
-             generator_eigvals=(_PAULI_HALF,) * 3),
+             generator_eigvals=(_PAULI_HALF,) * 3, derivative_fn=_drot),
     GateSpec("U3", 1, 3, _u3, lambda p: ("U3", (-p[0], -p[2], -p[1])),
-             generator_eigvals=(_PAULI_HALF, _PROJECTOR, _PROJECTOR)),
+             generator_eigvals=(_PAULI_HALF, _PROJECTOR, _PROJECTOR), derivative_fn=_du3),
     # --- two-qubit gates (controlled gates are built from base + controls, not listed here)
     GateSpec("SWAP", 2, 0,
              _const([[1, 0, 0, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 0, 1]]), _named("SWAP"),

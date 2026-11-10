@@ -1,7 +1,7 @@
-"""Our gradients equal PennyLane's backprop gradients (QS-401, QS-402, ADR-0004).
+"""Our gradients equal PennyLane's backprop gradients (QS-401, QS-402, QS-404, ADR-0004).
 
 PennyLane differentiates its own native gates by automatic differentiation, which is independent of
-our gates, our shift rules and our finite differences. Exact methods must agree at the standard
+our gates, derivatives, shift rules and finite differences. Exact methods must agree at the standard
 complex128 tolerance; finite differences at the gradient tolerance. Every random-circuit
 parameter becomes its own symbol, except that some are deliberately shared, to exercise the chain
 rule over slots.
@@ -44,6 +44,7 @@ def _random_observables(n_wires: int, rng: np.random.Generator) -> list[Observab
 
 
 METHODS: dict[Method, Tolerance] = {
+    "adjoint": TOLERANCES[np.dtype(np.complex128)],
     "parameter-shift": TOLERANCES[np.dtype(np.complex128)],
     "finite-diff": GRADIENT_FD,
 }

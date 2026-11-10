@@ -215,6 +215,31 @@ class Operation:
         full[start : start + k, start : start + k] = base
         return full
 
+    def derivative_matrix(self, param_index: int, dtype: DTypeLike = np.complex128) -> Matrix:
+        """Derivative of :meth:`matrix` with respect to parameter ``param_index``.
+
+        For a controlled gate this is the base derivative on the block where every control
+        matches, and **zero** elsewhere: the identity blocks don't depend on the parameter
+        (ADR-0004 D3).
+
+        Examples
+        --------
+        >>> CRZ(0.0, 0, 1).derivative_matrix(0).round(6).diagonal()
+        array([0.+0.j , 0.+0.j , 0.-0.5j, 0.+0.5j])
+        """
+        base = self.spec.derivative(self._numeric_params(), param_index, dtype)
+        n_ctrl = len(self.controls)
+        if n_ctrl == 0:
+            return base
+        k = 1 << len(self.wires)
+        full = np.zeros((k << n_ctrl, k << n_ctrl), dtype=as_complex_dtype(dtype))
+        trigger = 0
+        for v in self.control_values:
+            trigger = (trigger << 1) | int(v)
+        start = trigger * k
+        full[start : start + k, start : start + k] = base
+        return full
+
     def bind(self, values: Mapping[str, float]) -> "Operation":
         """Return a copy with symbolic parameters replaced by values from ``values`` (by name).
 
