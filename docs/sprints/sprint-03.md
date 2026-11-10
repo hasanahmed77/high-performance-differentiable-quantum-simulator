@@ -75,6 +75,7 @@ independent of circuit depth.
 - **Adjoint memory:** the memory test showed 2M λ states instead of M (#121).
 - **Two-term rule:** a test that only measured the target qubit would have hidden the wrong shift rule for controlled rotations. It now measures the control (#120).
 - **Signed zeros:** Linux and Windows doctests printed `-0.`, twice (#121, #123). The math was right; only the printing differed by platform.
+- **Over-precise docs:** the H₂ page printed a finite-difference gradient to 8 decimals, past its ~1e-9 accuracy, so Linux rounded the last digit differently. The executed-docs test caught it; the page prints 6 decimals now (#124).
 
 ### Benchmark deltas
 
@@ -91,7 +92,7 @@ later.
 | Sprint duration | 2026-11-10 to 2026-11-11 |
 | WIP limits | Held: one story PR in review at a time (serial by design) |
 | Escaped defects | 0 |
-| CI failures before merge | 2, both signed-zero doctests on Linux and Windows |
+| CI failures before merge | 3, all platform-dependent output: two signed-zero doctests (#121, #123) and one over-precise docs print (#124) |
 
 ### Demo
 
@@ -108,7 +109,7 @@ print(f"{(hartree_fock - exact) * 1000:.2f} mHa")   # 20.59 mHa of correlation e
 
 | Keep | Change | Try |
 |---|---|---|
-| **Chain the oracles.** Finite differences checked parameter-shift, which checked adjoint, and PennyLane checked all three. Each method landed with an independent reference already in place | **Signed zeros broke CI twice.** macOS (Accelerate) and Linux/Windows (OpenBLAS) differ in the sign of zero. Doctests that print arrays now normalize with `+ 0.0` | Run the doctests in a Linux container locally before pushing (free, with Docker or Colima) |
+| **Chain the oracles.** Finite differences checked parameter-shift, which checked adjoint, and PennyLane checked all three. Each method landed with an independent reference already in place | **Signed zeros broke CI twice.** macOS (Accelerate) and Linux/Windows (OpenBLAS) differ in the sign of zero. Doctests that print arrays now normalize with `+ 0.0`, and printed values never exceed the precision of the method | Run the doctests in a Linux container locally before pushing (free, with Docker or Colima) |
 | **Measure the ADR's claims.** The memory test turned "2 + M states" into a number, and caught the code breaking it | **Label only fragment-less PRs `skip-changelog`.** I added it to #122 out of habit and removed it | Run `mutmut` nightly instead of hand-written mutants (carried over from Sprints 1 and 2) |
 | **Run the docs.** The H₂ page is executed by the tests, and every printed line must appear on the page | Regenerating golden files rewrote an unrelated one with 1-ulp noise. It was restored; regeneration should write only the files that changed meaningfully | |
 
