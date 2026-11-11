@@ -6,6 +6,6 @@ The public API grows sprint by sprint; see ``plan.md`` in the repository for the
 from ketjet.circuit import Circuit
 from ketjet.statevector import MAX_QUBITS, state_nbytes, zero_state
 
-__version__ = "0.0.0"
+__version__ = "0.1.0"
 
 __all__ = ["MAX_QUBITS", "Circuit", "__version__", "state_nbytes", "zero_state"]
