@@ -71,6 +71,9 @@ print(gradients.grad(circuit, H, values).round(6))                            # 
 print(gradients.grad(circuit, H, values, method="parameter-shift").round(6))  # [ 0.477668 -0.717356]
 ```
 
+More runnable examples (a Bell state, the QFT and a VQE for H₂), each checked in CI, are in
+[`examples/`](https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator/tree/main/examples).
+
 ## What you get
 
 - **A PennyLane device**, `ketjet.qubit`: every PennyLane gate and template runs, by decomposition into ketjet's

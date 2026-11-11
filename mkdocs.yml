@@ -37,6 +37,7 @@ nav:
   - Getting started: getting-started.md
   - PennyLane device: pennylane.md
   - Examples:
+      - "Example scripts": examples/index.md
       - "Ground state of H₂ (VQE)": examples/vqe-h2.md
   - API reference: reference.md
   - Design decisions:
