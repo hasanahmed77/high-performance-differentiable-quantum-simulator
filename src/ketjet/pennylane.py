@@ -37,6 +37,7 @@ from pennylane.transforms.core import CompilePipeline
 from pennylane.wires import Wires
 
 from ketjet.backends import Backend, NumPyBackend
+from ketjet.gates import GATES
 from ketjet.measurements import sample
 from ketjet.observables import Hermitian, Observable, Pauli, Sum
 from ketjet.operations import Operation
@@ -71,10 +72,18 @@ _ADJOINT: Final[dict[str, str]] = {"S": "Sdg", "T": "Tdg", "SX": "SXdg", "ISWAP"
 
 
 def _base_gate(op: Any) -> str | None:
-    """Return the ketjet gate for an uncontrolled PennyLane operation, or ``None``."""
+    """Return the ketjet gate for an uncontrolled PennyLane operation, or ``None``.
+
+    The wire count must match too: PennyLane's ``Identity`` takes any number of wires, ketjet's
+    ``I`` one, so a multi-wire ``Identity`` is left to ``decompose``.
+    """
     if isinstance(op, Adjoint):
-        return _ADJOINT.get(op.base.name) if not op.base.parameters else None
-    return _BASE.get(op.name)
+        gate = _ADJOINT.get(op.base.name) if not op.base.parameters else None
+    else:
+        gate = _BASE.get(op.name)
+    if gate is None or len(op.wires) != GATES[gate].num_wires:
+        return None
+    return gate
 
 
 def _is_supported(op: Any) -> bool:
