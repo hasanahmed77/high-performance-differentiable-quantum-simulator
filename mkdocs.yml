@@ -35,6 +35,7 @@ theme:
 nav:
   - Home: index.md
   - Getting started: getting-started.md
+  - PennyLane device: pennylane.md
   - Examples:
       - "Ground state of H₂ (VQE)": examples/vqe-h2.md
   - API reference: reference.md

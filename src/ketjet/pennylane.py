@@ -34,6 +34,7 @@ from pennylane.devices.preprocess import (
     validate_device_wires,
     validate_measurements,
 )
+from pennylane.exceptions import DeviceError
 from pennylane.measurements import ExpectationMP, ProbabilityMP, VarianceMP
 from pennylane.ops.op_math import Adjoint, Controlled
 from pennylane.tape import QuantumScript
@@ -43,6 +44,7 @@ from pennylane.wires import Wires
 
 from ketjet.backends import Backend, NumPyBackend
 from ketjet.gates import GATES
+from ketjet.kernels import apply_matrix
 from ketjet.measurements import sample
 from ketjet.observables import Hermitian, Observable, Pauli, Sum
 from ketjet.operations import Operation
@@ -204,6 +206,58 @@ def _when_sampled(tape: QuantumScript, inner: Callable[..., Any]) -> Any:
     return inner(tape)
 
 
+def _to_eigenbasis(
+    host: StateVector, measurements: Sequence[Any], wire_order: Wires
+) -> StateVector:
+    """Rotate a host state into the eigenbasis of the measured observables.
+
+    PennyLane's ``process_state`` and ``process_samples`` read an observable's outcomes in its
+    eigenbasis (its ``diagonalizing_gates``), which ``default.qubit`` rotates to before measuring.
+    Pauli observables were already rotated by ``diagonalize_measurements``; ``Hermitian`` and
+    ``Projector`` are left to the device. After ``split_non_commuting`` the observables of one
+    tape can be measured together, so each distinct rotation gate is applied once, even when
+    several measurements share it (e.g. ``expval(H)`` and ``var(H)``).
+    """
+    index = {w: i for i, w in enumerate(wire_order)}
+    applied: set[int] = set()
+    for mp in measurements:
+        for gate in mp.obs.diagonalizing_gates() if mp.obs is not None else ():
+            if gate.hash in applied:
+                continue
+            applied.add(gate.hash)
+            host = apply_matrix(host, qml.matrix(gate), [index[w] for w in gate.wires])
+    return host
+
+
+def _undecomposable(op: Any) -> bool:
+    """Return ``True`` for unsupported operations with a matrix but no decomposition."""
+    return not _is_supported(op) and not op.has_decomposition and op.has_matrix
+
+
+@qml.transform  # type: ignore[untyped-decorator]
+def _matrix_fallback(tape: QuantumScript) -> Any:
+    """Rewrite operations with a matrix but no decomposition as ``QubitUnitary`` (ADR-0005 D3).
+
+    PennyLane decomposes ``QubitUnitary`` on any number of wires, so ``decompose`` can then
+    reach the supported set; e.g. ``DoubleExcitationPlus`` and ``BlockEncode`` have no rule of
+    their own. That decomposition can't be differentiated (it uses SciPy), so trainable
+    parameters raise instead of silently getting a zero gradient.
+    """
+    operations = []
+    for op in tape.operations:
+        if not _undecomposable(op):
+            operations.append(op)
+            continue
+        if any(qml.math.requires_grad(p) for p in op.data):
+            raise DeviceError(
+                f"{op.name} has no decomposition, so ketjet.qubit runs it from its matrix, which "
+                "can't be differentiated. Make its parameters non-trainable, or use a device "
+                "that supports it natively, such as default.qubit."
+            )
+        operations.append(qml.QubitUnitary(qml.matrix(op), wires=op.wires))
+    return (tape.copy(operations=operations),), null_postprocessing
+
+
 _ADJOINT_METHODS: Final[frozenset[str]] = frozenset({"adjoint", "best", "device"})
 """Gradient methods the device answers with its own adjoint derivatives (ADR-0005 D4)."""
 
@@ -297,6 +351,16 @@ class KetjetQubit(Device):  # type: ignore[misc]  # PennyLane ships no type hint
         program = CompilePipeline()
         program.add_transform(validate_device_wires, wires=self.wires, name=self.name)
         program.add_transform(defer_measurements, allow_postselect=False)
+        # Decompose down to supported gates, or to gates with only a matrix (which may appear
+        # only mid-decomposition, as BlockEncode inside QSVT does); rewrite those as QubitUnitary;
+        # then decompose again, which always ends in the supported set.
+        program.add_transform(
+            decompose,
+            stopping_condition=lambda op: _is_supported(op) or _undecomposable(op),
+            skip_initial_state_prep=False,
+            name=self.name,
+        )
+        program.add_transform(_matrix_fallback)
         program.add_transform(
             decompose,
             stopping_condition=_is_supported,
@@ -503,14 +567,14 @@ class KetjetQubit(Device):  # type: ignore[misc]  # PennyLane ships no type hint
         if isinstance(mp, ProbabilityMP) and mp.obs is None:
             wires = [index[w] for w in mp.wires] if mp.wires else None
             return np.asarray(backend.probs(state, wires), dtype=np.float64)
-        host: StateVector = backend.to_numpy(state)
+        host = _to_eigenbasis(backend.to_numpy(state), [mp], wire_order)
         return mp.process_state(host, wire_order)
 
     def _sampled(
         self, tape: QuantumScript, state: Any, wire_order: Wires, rng: np.random.Generator
     ) -> Any:
         """Return shot-based results, per shot bin, from one batch of ketjet samples."""
-        host: StateVector = self._backend.to_numpy(state)
+        host = _to_eigenbasis(self._backend.to_numpy(state), tape.measurements, wire_order)
         samples = sample(host, tape.shots.total_shots, seed=rng)
         per_bin = []
         for lower, upper in tape.shots.bins():

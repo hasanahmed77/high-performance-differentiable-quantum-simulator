@@ -49,6 +49,13 @@ test = [
     "diff-cover>=9.0",
     "pennylane>=0.44,<0.46",
 ]
+conformance = [
+    # PennyLane's own device test suite (pl-device-test) needs these; kept out of the main suite.
+    "pennylane>=0.44,<0.46",
+    "pytest>=9.0",
+    "pytest-mock>=3.14",
+    "flaky>=3.8",
+]
 lint = [
     "ruff>=0.17",
     "mypy>=2.0",

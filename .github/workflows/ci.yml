@@ -90,6 +90,23 @@ jobs:
         if: github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest' && matrix.python == '3.13'
         run: uv run diff-cover coverage.xml --compare-branch=origin/${{ github.base_ref }} --fail-under=90
 
+  conformance:
+    name: PennyLane device suite (pl-device-test)
+    # PennyLane's own device tests, in exact and in shot mode (ADR-0005 D6). Every skip is
+    # explained in docs/pennylane.md.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+          python-version: "3.13"
+      - run: uv sync --group conformance
+      - name: Exact mode
+        run: uv run pl-device-test --device=ketjet.qubit -rfs
+      - name: Shot mode (10,000 shots)
+        run: uv run pl-device-test --device=ketjet.qubit --analytic=False --shots=10000 -rfs
+
   build:
     name: Build and smoke-test distributions
     runs-on: ubuntu-latest
@@ -103,8 +120,11 @@ jobs:
           uv pip install --python /tmp/smoke dist/*.whl
           /tmp/smoke/bin/python - <<'EOF'
           import importlib.resources, ketjet
+          import importlib.metadata
           assert importlib.resources.files("ketjet").joinpath("py.typed").is_file()
-          print("ketjet", ketjet.__version__, "imported from wheel")
+          plugins = importlib.metadata.entry_points(group="pennylane.plugins")
+          assert [e.value for e in plugins if e.name == "ketjet.qubit"] == ["ketjet.pennylane:KetjetQubit"]
+          print("ketjet", ketjet.__version__, "imported from wheel; ketjet.qubit entry point registered")
           EOF
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -116,7 +136,7 @@ jobs:
     name: CI success
     # Single required status check for branch protection; fails if any job failed or was cancelled.
     if: always()
-    needs: [lint, changelog, types, test, build]
+    needs: [lint, changelog, types, test, conformance, build]
     runs-on: ubuntu-latest
     steps:
       - name: Check all jobs passed
