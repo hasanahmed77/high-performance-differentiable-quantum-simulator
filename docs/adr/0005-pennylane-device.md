@@ -90,8 +90,11 @@ device sees it. That keeps gradient bookkeeping trivial (D4): tape parameter *k*
   traceable by an autodiff framework. ketjet's NumPy kernels are deliberately plain NumPy (the correctness oracle,
   plan.md §3), so autograd, JAX and Torch can't trace them. Backprop arrives with the JAX backend (Sprint 5/6,
   QS-606). **This narrows QS-504's acceptance criteria** from "adjoint and backprop" to "adjoint (device), plus
-  PennyLane's parameter-shift and finite differences". The device raises a clear error suggesting adjoint for
-  `backprop`.
+  PennyLane's parameter-shift and finite differences". Asking for `backprop` raises PennyLane's own
+  `QuantumFunctionError`, which names backprop and the device. The device reports "not supported" instead of
+  raising its own message, because PennyLane also calls the support check just to ask, and the hint to use
+  adjoint goes in the device documentation (amended in QS-504; the first draft promised the device's own
+  error).
 
 ### D5. Measurements: native where it matters, PennyLane for the rest
 

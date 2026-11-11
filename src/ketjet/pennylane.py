@@ -10,22 +10,27 @@ PennyLane decomposes every circuit into the gates ketjet supports (ADR-0005 D3).
 PennyLane operation then becomes exactly one ketjet :class:`~ketjet.operations.Operation` with the
 same parameters in the same order (D2), and the circuit runs on a ketjet backend. Expectation
 values, variances and probabilities are computed by ketjet; other measurements use PennyLane's own
-definitions on ketjet's state (D5).
+definitions on ketjet's state (D5). ``diff_method="adjoint"`` (also what ``"best"`` picks for exact
+expectation values) uses ketjet's adjoint Jacobian and single-pass VJP (D4).
 
 This module imports PennyLane. ``import ketjet`` doesn't import it (ADR-0005 D1).
 """
 
+import dataclasses
 from collections.abc import Callable, Sequence
 from typing import Any, Final
 
 import numpy as np
+import numpy.typing as npt
 import pennylane as qml
 from pennylane.devices import Device, ExecutionConfig
 from pennylane.devices.modifiers import simulator_tracking, single_tape_support
 from pennylane.devices.preprocess import (
     decompose,
     diagonalize_measurements,
+    no_sampling,
     null_postprocessing,
+    validate_adjoint_trainable_params,
     validate_device_wires,
     validate_measurements,
 )
@@ -199,6 +204,37 @@ def _when_sampled(tape: QuantumScript, inner: Callable[..., Any]) -> Any:
     return inner(tape)
 
 
+_ADJOINT_METHODS: Final[frozenset[str]] = frozenset({"adjoint", "best", "device"})
+"""Gradient methods the device answers with its own adjoint derivatives (ADR-0005 D4)."""
+
+
+def _adjoint_supported(circuit: QuantumScript | None) -> bool:
+    """Return ``True`` if ``circuit`` is exact and measures only translatable expectation values."""
+    if circuit is None:
+        return True
+    if circuit.shots or not circuit.measurements:
+        return False
+    index = {w: i for i, w in enumerate(circuit.wires)}
+    for mp in circuit.measurements:
+        if not isinstance(mp, ExpectationMP):
+            return False
+        try:
+            to_ketjet_observable(mp.obs, index)
+        except (ValueError, TypeError):
+            return False
+    return True
+
+
+def _format_jacobian(jac: npt.NDArray[np.float64]) -> Any:
+    """Shape an ``(M, T)`` Jacobian the way PennyLane expects (as ``default.qubit`` does)."""
+    squeezed = np.squeeze(jac)
+    if squeezed.ndim == 0:
+        return np.array(squeezed)
+    if squeezed.ndim == 1:
+        return tuple(np.array(j) for j in squeezed)
+    return tuple(tuple(np.array(j) for j in row) for row in squeezed)
+
+
 # --------------------------------------------------------------------------- the device
 
 
@@ -271,7 +307,86 @@ class KetjetQubit(Device):  # type: ignore[misc]  # PennyLane ships no type hint
         program.add_transform(broadcast_expand)
         program.add_transform(_when_sampled, inner=split_non_commuting)
         program.add_transform(_when_sampled, inner=diagonalize_measurements)
+        if execution_config is not None and execution_config.gradient_method == "adjoint":
+            program.add_transform(no_sampling, name=f"adjoint + {self.name}")
+            program.add_transform(validate_adjoint_trainable_params)
         return program
+
+    # ------------------------------------------------------------------- derivatives (D4)
+
+    def supports_derivatives(
+        self,
+        execution_config: ExecutionConfig | None = None,
+        circuit: QuantumScript | None = None,
+    ) -> bool:
+        """Return ``True`` for first-order adjoint derivatives of exact expectation values.
+
+        ``"best"`` and ``"device"`` mean adjoint here. ``"backprop"`` isn't supported: ketjet's
+        NumPy kernels can't be traced by autodiff frameworks (ADR-0005 D4).
+        """
+        if execution_config is None:
+            return True
+        if (
+            execution_config.gradient_method not in _ADJOINT_METHODS
+            or execution_config.derivative_order != 1
+        ):
+            return False
+        return _adjoint_supported(circuit)
+
+    def supports_vjp(
+        self,
+        execution_config: ExecutionConfig | None = None,
+        circuit: QuantumScript | None = None,
+    ) -> bool:
+        """Return ``True`` where :meth:`supports_derivatives` does."""
+        return self.supports_derivatives(execution_config, circuit)
+
+    def setup_execution_config(
+        self, config: ExecutionConfig | None = None, circuit: QuantumScript | None = None
+    ) -> ExecutionConfig:
+        """Resolve ``"best"`` and ``"device"`` to adjoint where the device supports it."""
+        config = super().setup_execution_config(config, circuit)
+        if config.gradient_method not in _ADJOINT_METHODS or not self.supports_derivatives(
+            config, circuit
+        ):
+            return config
+        updates: dict[str, Any] = {"gradient_method": "adjoint"}
+        for option in ("use_device_gradient", "use_device_jacobian_product", "grad_on_execution"):
+            if getattr(config, option) is None:
+                updates[option] = True
+        return dataclasses.replace(config, **updates)
+
+    def compute_derivatives(
+        self, circuits: Sequence[QuantumScript], execution_config: ExecutionConfig | None = None
+    ) -> tuple[Any, ...]:
+        """Return each tape's Jacobian from one backend adjoint call (ADR-0004 D4)."""
+        return tuple(_format_jacobian(self._adjoint(tape)) for tape in circuits)
+
+    def execute_and_compute_derivatives(
+        self, circuits: Sequence[QuantumScript], execution_config: ExecutionConfig | None = None
+    ) -> tuple[tuple[Any, ...], tuple[Any, ...]]:
+        """Return the results and the Jacobians."""
+        return self.execute(circuits, execution_config), self.compute_derivatives(circuits)
+
+    def compute_vjp(
+        self,
+        circuits: Sequence[QuantumScript],
+        cotangents: Sequence[Any],
+        execution_config: ExecutionConfig | None = None,
+    ) -> tuple[Any, ...]:
+        """Return each tape's vector-Jacobian product: one backward pass per cotangent (D6)."""
+        return tuple(
+            self._vjp(tape, cotangent) for tape, cotangent in zip(circuits, cotangents, strict=True)
+        )
+
+    def execute_and_compute_vjp(
+        self,
+        circuits: Sequence[QuantumScript],
+        cotangents: Sequence[Any],
+        execution_config: ExecutionConfig | None = None,
+    ) -> tuple[tuple[Any, ...], tuple[Any, ...]]:
+        """Return the results and the vector-Jacobian products."""
+        return self.execute(circuits, execution_config), self.compute_vjp(circuits, cotangents)
 
     def execute(
         self, circuits: Sequence[QuantumScript], execution_config: ExecutionConfig | None = None
@@ -281,6 +396,71 @@ class KetjetQubit(Device):  # type: ignore[misc]  # PennyLane ships no type hint
         return tuple(self._run(tape, rng) for tape, rng in zip(circuits, children, strict=True))
 
     # ------------------------------------------------------------------- internals
+
+    def _adjoint_problem(
+        self, tape: QuantumScript
+    ) -> tuple[int, list[Operation], list[Observable], list[tuple[int, int] | None]]:
+        """Translate a tape for the backend; each trainable parameter becomes one slot (D2).
+
+        Trainable parameters with no slot (``None``) get a zero derivative: a ``GlobalPhase``
+        doesn't change any expectation value, and observable parameters aren't differentiated by
+        adjoint (PennyLane warns about them in ``validate_adjoint_trainable_params``).
+        """
+        wire_order = self._wire_order(tape)
+        index = {w: i for i, w in enumerate(wire_order)}
+        operations: list[Operation] = []
+        position: list[int | None] = []  # tape operation index -> translated index
+        for op in tape.operations:
+            if isinstance(op, qml.GlobalPhase):
+                position.append(None)
+                continue
+            position.append(len(operations))
+            operations.append(to_ketjet(op, index))
+        slots: list[tuple[int, int] | None] = []
+        for k in tape.trainable_params:
+            info = tape.par_info[k]
+            # Parameters after the operations belong to the measured observables.
+            translated = position[info["op_idx"]] if info["op_idx"] < len(position) else None
+            slots.append(None if translated is None else (translated, info["p_idx"]))
+        observables = [to_ketjet_observable(mp.obs, index) for mp in tape.measurements]
+        return max(len(wire_order), 1), operations, observables, slots
+
+    def _jacobian(
+        self,
+        n_wires: int,
+        operations: list[Operation],
+        observables: list[Observable],
+        slots: list[tuple[int, int] | None],
+    ) -> npt.NDArray[np.float64]:
+        """Return the ``(M, T)`` Jacobian; ``None`` slots give zero columns."""
+        jac = np.zeros((len(observables), len(slots)))
+        real = [k for k, slot in enumerate(slots) if slot is not None]
+        if real and observables:
+            trainable = [slot for slot in slots if slot is not None]
+            jac[:, real] = self._backend.adjoint_jacobian(
+                n_wires, operations, observables, trainable, dtype=self._dtype
+            )
+        return jac
+
+    def _adjoint(self, tape: QuantumScript) -> npt.NDArray[np.float64]:
+        return self._jacobian(*self._adjoint_problem(tape))
+
+    def _vjp(self, tape: QuantumScript, cotangent: Any) -> Any:
+        r"""Return the VJP: one backward pass over :math:`\sum_m v_m O_m` per cotangent (D6)."""
+        n_wires, operations, observables, slots = self._adjoint_problem(tape)
+        v = np.asarray(cotangent, dtype=np.float64)
+        if len(observables) == 1:
+            v = v[np.newaxis]  # PennyLane drops the measurement axis for one measurement
+        batched = v.ndim == 2  # (measurements, batch)
+        columns = v if batched else v[:, np.newaxis]
+        out = np.zeros((len(slots), columns.shape[1]))
+        for b in range(columns.shape[1]):
+            weights = columns[:, b]
+            if not weights.any():
+                continue  # a zero cotangent: no simulation needed
+            combined = Sum([(float(c), obs) for c, obs in zip(weights, observables, strict=True)])
+            out[:, b] = self._jacobian(n_wires, operations, [combined], slots)[0]
+        return out if batched else out[:, 0]
 
     def _wire_order(self, tape: QuantumScript) -> Wires:
         return self.wires if self.wires is not None else tape.wires
