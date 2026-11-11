@@ -91,7 +91,14 @@ jobs:
               --index-url https://test.pypi.org/simple/ "ketjet==$VERSION" && break
             echo "Not yet available on TestPyPI (attempt $i); retrying in 30s"; sleep 30
           done
-          "$PY" -c "import importlib.metadata as m; print('\n'.join(r for r in (m.requires('ketjet') or []) if 'extra ==' not in r))" > reqs.txt
+          # Dependencies, including the [pennylane] extra's, from PyPI only.
+          "$PY" - > reqs.txt <<'EOF'
+          import importlib.metadata as m
+          for r in m.requires("ketjet") or []:
+              requirement, _, marker = r.partition(";")
+              if "extra ==" not in marker or "pennylane" in marker:
+                  print(requirement.strip())
+          EOF
           uv pip install --python "$PY" -r reqs.txt
       - name: Import and check metadata
         env:
@@ -103,6 +110,26 @@ jobs:
           assert importlib.metadata.version("ketjet") == os.environ["VERSION"]
           assert importlib.resources.files("ketjet").joinpath("py.typed").is_file()
           print("ketjet", ketjet.__version__, "OK from TestPyPI")
+          EOF
+      - name: Run a QNode on ketjet.qubit, with adjoint gradients
+        run: |
+          "$PY" - <<'EOF'
+          import pennylane as qml
+          from pennylane import numpy as np
+
+          dev = qml.device("ketjet.qubit", wires=2)
+          assert type(dev).__module__ == "ketjet.pennylane", type(dev)
+
+          @qml.qnode(dev, diff_method="adjoint")
+          def circuit(x):
+              qml.RY(x, wires=0)
+              qml.CNOT(wires=[0, 1])
+              return qml.expval(qml.PauliZ(1))
+
+          x = np.array(0.3, requires_grad=True)
+          assert abs(circuit(x) - np.cos(0.3)) < 1e-12
+          assert abs(qml.grad(circuit)(x) + np.sin(0.3)) < 1e-12
+          print("ketjet.qubit OK: value and adjoint gradient match the exact results")
           EOF
 
   publish-pypi:

@@ -1,14 +1,18 @@
 # Getting started
 
-!!! note
-    ketjet hasn't been released on PyPI yet. Until v0.1.0, install it from source.
-
 ## Requirements
 
 - Python 3.12–3.15
 - Linux, macOS or Windows
 
-## Install from source
+## Install
+
+```bash
+pip install ketjet                 # the simulator; needs only NumPy
+pip install "ketjet[pennylane]"    # plus the PennyLane device, see "PennyLane device"
+```
+
+The latest development version installs from source:
 
 ```bash
 pip install git+https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator.git

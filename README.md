@@ -2,14 +2,15 @@
 
 **A high-performance differentiable quantum statevector simulator, usable as a PennyLane device.**
 
+[![PyPI](https://img.shields.io/pypi/v/ketjet)](https://pypi.org/project/ketjet/)
 [![CI](https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator/actions/workflows/ci.yml)
 [![Docs](https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator/actions/workflows/docs.yml/badge.svg?branch=main)](https://hasanahmed77.github.io/high-performance-differentiable-quantum-simulator/)
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14%20%7C%203.15-blue)](https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator/blob/main/pyproject.toml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green)](https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator/blob/main/LICENSE)
 [![Type checked: mypy strict](https://img.shields.io/badge/types-mypy%20strict-informational)](https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator/blob/main/pyproject.toml)
 
-> **Status: pre-release.** v0.1.0, the NumPy reference simulator as a PennyLane device, is being released.
-> The faster backends (JAX, C++, CUDA) come next; see the [roadmap](#roadmap) and the
+> **Status: alpha (v0.1.0).** The NumPy reference simulator, with exact gradients, as a PennyLane device. The
+> faster backends (JAX, C++, CUDA) come next; see the [roadmap](#roadmap) and the
 > [project board](https://github.com/users/hasanahmed77/projects/2).
 
 ## Why
@@ -142,7 +143,7 @@ pip install "ketjet[pennylane] @ git+https://github.com/hasanahmed77/high-perfor
 
 | Release | Adds |
 |---|---|
-| **v0.1.0** | NumPy reference simulator, exact gradients, PennyLane device |
+| **v0.1.0** (released) | NumPy reference simulator, exact gradients, PennyLane device |
 | v0.2.0 | JAX backend: jit, vmap batching, GPU, backprop and adjoint inside JAX; then the first benchmarks |
 | v0.3.0 | Native C++ backend: SIMD and OpenMP, with prebuilt wheels |
 | v0.4.0 | Gate fusion and autotuning, with a CPU roofline and a performance report |

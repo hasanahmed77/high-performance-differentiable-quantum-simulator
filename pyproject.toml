@@ -13,7 +13,7 @@ requires-python = ">=3.12"
 authors = [{ name = "Mustakim Ahmed Hasan" }]
 keywords = ["quantum", "simulator", "statevector", "autodiff", "jax", "pennylane", "gpu"]
 classifiers = [
-    "Development Status :: 1 - Planning",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
     "Operating System :: MacOS",
     "Operating System :: Microsoft :: Windows",
@@ -79,7 +79,16 @@ default-groups = ["dev"]
 path = "src/ketjet/__init__.py"
 
 [tool.hatch.build.targets.sdist]
-include = ["src/ketjet", "tests", "README.md", "LICENSE", "CHANGELOG.md", "pyproject.toml"]
+include = [
+    "src/ketjet",
+    "tests",
+    "conftest.py",
+    "docs/examples/vqe-h2.md",  # executed by tests/integration/test_vqe_h2.py
+    "README.md",                # executed by tests/integration/test_readme.py
+    "LICENSE",
+    "CHANGELOG.md",
+    "pyproject.toml",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ketjet"]
