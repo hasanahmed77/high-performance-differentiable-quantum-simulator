@@ -200,17 +200,31 @@ def test_adjoint_rejects_variance_and_shots() -> None:
 # --------------------------------------------------------------------------- memory
 
 
+TRAINABLE = 20
+"""Trainable parameters in every memory circuit, so only the depth varies."""
+
+
 def _layered(n_wires: int, depth: int) -> tuple[list[Operation], list[tuple[int, int]]]:
-    """``depth`` layers of a trainable RX and a CNOT: depth trainable slots."""
+    """``depth`` layers of an RX and a CNOT; ``TRAINABLE`` RX gates, spread evenly, are trainable.
+
+    Holding the number of trainable parameters fixed matters: their bookkeeping (slot lists, the
+    Jacobian) is proportional to their number, which is unavoidable and isn't what "memory
+    independent of depth" is about.
+    """
     circuit: list[Operation] = []
     for d in range(depth):
         w = d % n_wires
         circuit += [ops.RX(0.1 * d, w), ops.CNOT(w, (w + 1) % n_wires)]
-    return circuit, [(2 * d, 0) for d in range(depth)]
+    layers = np.linspace(0, depth - 1, TRAINABLE).astype(int)
+    return circuit, [(2 * int(d), 0) for d in layers]
 
 
 def _peak_states(n_wires: int, depth: int, observables: list[Observable]) -> float:
     circuit, trainable = _layered(n_wires, depth)
+    # Measure the steady state: a first identical call pays one-time costs (lazily built objects,
+    # and Python's free lists filling up, which tracemalloc counts as allocated). Without it the
+    # peak depended on which tests had run before.
+    adjoint_jacobian(n_wires, circuit, observables, trainable)
     tracemalloc.start()
     try:
         adjoint_jacobian(n_wires, circuit, observables, trainable)
@@ -223,16 +237,21 @@ def _peak_states(n_wires: int, depth: int, observables: list[Observable]) -> flo
 def test_adjoint_memory_is_independent_of_depth() -> None:
     """Peak memory is a few states at depth 20 and at depth 500.
 
-    ψ, λ and the scratch μ, plus the kernel's temporaries, measure about 5.1 to 5.5 states.
-    Storing every intermediate state, as reverse-mode autodiff does, would need about 1000 at
-    depth 500.
+    ψ, λ and the scratch μ, plus the kernel's temporaries, measure about 5 states. Storing every
+    intermediate state, as reverse-mode autodiff does, would need about 1000 at depth 500.
+
+    Regression: run on its own, the first version failed (6.05 states) yet passed in the full
+    suite. It made every layer trainable, so parameter bookkeeping grew with depth, and it measured
+    a first call, which pays one-time costs that earlier tests had usually paid already. Measured
+    in steady state with a fixed parameter count, the peak stays at 5.1 to 5.35 states up to
+    depth 4000.
     """
     n_wires = 14  # one state is 256 KiB, far above incidental allocations
     shallow = _peak_states(n_wires, 20, [Z(0)])
     deep = _peak_states(n_wires, 500, [Z(0)])
     assert shallow <= 6
     assert deep <= 6
-    assert abs(deep - shallow) <= 0.5
+    assert abs(deep - shallow) <= 0.25
 
 
 def test_adjoint_memory_grows_by_one_state_per_observable() -> None:
