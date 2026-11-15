@@ -17,7 +17,7 @@
 | QS-604 | `jax.grad` through the simulator (backprop) | 3 | QS-603 | #138 |
 | QS-608 | PennyLane's JAX interface end to end: `backend="jax"`, `diff_method="backprop"`, `jax.jit` | 3 | QS-604 | #139 |
 | QS-110 | Dependabot, CodeQL and pip-audit | 2 | n/a | #140 |
-| QS-112 | Reproducible GPU workstation environment (WSL2 Ubuntu, CUDA 12, pinned image, setup guide) | 3 | n/a | |
+| QS-112 | Reproducible GPU workstation environment (WSL2 Ubuntu, CUDA 12, pinned image, setup guide) | 3 | n/a |#142 |
 | QS-507 | CI job for the minimum and latest supported PennyLane and JAX versions (**stretch**) | 2 | QS-608 | #141 |
 | | **Total** | **23** (21 committed + 2 stretch) | | |
 

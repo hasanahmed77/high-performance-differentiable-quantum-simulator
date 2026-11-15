@@ -1,0 +1,50 @@
+name: GPU image
+
+# Builds the GPU workstation image (environment/gpu.Dockerfile, QS-112) whenever it or the
+# locked dependencies change, and smoke-tests it on a hosted runner. Hosted runners have no GPU,
+# so the check runs with --allow-cpu; the GPU checks run on the workstation itself
+# (docs/dev/gpu-workstation.md) and, from Sprint 6, in gpu.yml.
+on:
+  pull_request:
+    paths:
+      - environment/**
+      - pyproject.toml
+      - uv.lock
+      - .python-version
+      - .dockerignore
+      - .github/workflows/gpu-image.yml
+  push:
+    branches: [main]
+    paths:
+      - environment/**
+      - pyproject.toml
+      - uv.lock
+      - .python-version
+      - .dockerignore
+      - .github/workflows/gpu-image.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gpu-image-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Build and smoke-test the GPU image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build
+        run: docker build -f environment/gpu.Dockerfile -t ketjet-gpu .
+      - name: Image size
+        run: docker image ls ketjet-gpu --format '{{.Size}}'
+      - name: Environment check without a GPU
+        run: docker run --rm ketjet-gpu python environment/check_gpu.py --allow-cpu
+      - name: JAX backend tests inside the image
+        run: >-
+          docker run --rm ketjet-gpu pytest -p no:cacheprovider -q
+          tests/unit/test_jax_backend.py tests/unit/test_compile_circuit.py
+          tests/unit/test_backprop.py
