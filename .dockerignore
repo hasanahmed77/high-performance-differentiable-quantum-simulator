@@ -1,0 +1,15 @@
+# Keep the build context to what the GPU image needs (environment/gpu.Dockerfile).
+.git
+.venv
+.claude
+**/__pycache__
+.mypy_cache
+.ruff_cache
+.pytest_cache
+.hypothesis
+.coverage*
+coverage.xml
+htmlcov
+site
+dist
+build

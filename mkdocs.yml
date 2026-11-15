@@ -54,7 +54,9 @@ nav:
       - "Sprint 03: Differentiation": sprints/sprint-03.md
       - "Sprint 04: PennyLane device and v0.1.0": sprints/sprint-04.md
       - "Sprint 05: JAX backend I": sprints/sprint-05.md
-  - Development: development.md
+  - Development:
+      - "Development": development.md
+      - "GPU workstation": dev/gpu-workstation.md
 
 exclude_docs: |
   /adr/0000-template.md

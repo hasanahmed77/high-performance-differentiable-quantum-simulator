@@ -75,12 +75,22 @@ docs = [
     "mkdocs-material>=9.6",
     "mkdocstrings[python]>=0.30",
 ]
+gpu = [
+    # The GPU workstation image (environment/gpu.Dockerfile, QS-112). The CUDA 12 runtime comes as
+    # pip wheels, matched to jaxlib, so the image needs only the host's NVIDIA driver. Linux only.
+    "jax[cuda12]>=0.10; sys_platform == 'linux'",
+]
 
 [tool.uv]
 default-groups = ["dev"]
 # The main suite tests the latest JAX; the conformance suite needs the last JAX that PennyLane's
 # JAX interface supports (ADR-0006 D1). The two groups are never installed together.
-conflicts = [[{ group = "test" }, { group = "conformance" }], [{ group = "dev" }, { group = "conformance" }]]
+# The GPU image uses the main suite's JAX.
+conflicts = [
+    [{ group = "test" }, { group = "conformance" }],
+    [{ group = "dev" }, { group = "conformance" }],
+    [{ group = "gpu" }, { group = "conformance" }],
+]
 
 # --------------------------------------------------------------------------- build
 [tool.hatch.version]

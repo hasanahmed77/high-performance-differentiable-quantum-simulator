@@ -9,7 +9,7 @@ set -euo pipefail
 out="$(mktemp -d)"
 trap 'rm -rf "$out"' EXIT
 
-uv export --frozen --quiet --all-extras --group dev --group docs --no-emit-project \
+uv export --frozen --quiet --all-extras --group dev --group docs --group gpu --no-emit-project \
   --output-file "$out/main.txt"
 uv export --frozen --quiet --all-extras --no-default-groups --group conformance --no-emit-project \
   --output-file "$out/conformance.txt"
