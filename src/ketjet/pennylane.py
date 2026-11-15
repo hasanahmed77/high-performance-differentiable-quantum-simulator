@@ -34,7 +34,9 @@ from pennylane.devices.preprocess import (
     validate_device_wires,
     validate_measurements,
 )
+from pennylane.devices.qubit import measure
 from pennylane.exceptions import DeviceError
+from pennylane.math import Interface
 from pennylane.measurements import ExpectationMP, ProbabilityMP, VarianceMP
 from pennylane.ops.op_math import Adjoint, Controlled
 from pennylane.tape import QuantumScript
@@ -123,6 +125,14 @@ def to_ketjet(op: Any, wire_index: dict[Any, int]) -> Operation:
     ValueError
         If ``op`` isn't in the supported set.
     """
+    gate, wires, controls, values, params = _translate(op, wire_index)
+    return Operation(gate, wires, tuple(float(p) for p in params), controls, values)
+
+
+def _translate(
+    op: Any, wire_index: dict[Any, int]
+) -> tuple[str, tuple[int, ...], tuple[int, ...], tuple[bool, ...], tuple[Any, ...]]:
+    """Return an operation's ketjet structure and its parameters, untouched (traced ones too)."""
     controls: tuple[int, ...] = ()
     values: tuple[bool, ...] = ()
     base = op
@@ -134,8 +144,7 @@ def to_ketjet(op: Any, wire_index: dict[Any, int]) -> Operation:
     if gate is None:
         raise ValueError(f"ketjet.qubit can't run {op.name} directly; it should be decomposed.")
     wires = tuple(wire_index[w] for w in base.wires)
-    params = tuple(float(p) for p in base.parameters)
-    return Operation(gate, wires, params, controls, values)
+    return gate, wires, controls, values or (True,) * len(controls), tuple(base.parameters)
 
 
 _PAULI: Final[dict[str, str]] = {"PauliX": "X", "PauliY": "Y", "PauliZ": "Z"}
@@ -259,6 +268,12 @@ def _matrix_fallback(tape: QuantumScript) -> Any:
 
 
 _ADJOINT_METHODS: Final[frozenset[str]] = frozenset({"adjoint", "best", "device"})
+
+_BACKPROP_INTERFACES: Final[frozenset[Interface]] = frozenset(
+    {Interface.JAX, Interface.JAX_JIT, Interface.NUMPY}
+)
+"""Interfaces whose parameters the JAX backend can take under backprop (ADR-0006 D8): JAX's own,
+and plain NumPy, which needs no derivatives."""
 """Gradient methods the device answers with its own adjoint derivatives (ADR-0005 D4)."""
 
 
@@ -387,13 +402,17 @@ class KetjetQubit(Device):  # type: ignore[misc]  # PennyLane ships no type hint
         execution_config: ExecutionConfig | None = None,
         circuit: QuantumScript | None = None,
     ) -> bool:
-        """Return ``True`` for first-order adjoint derivatives of exact expectation values.
+        """Return ``True`` for adjoint derivatives of exact expectation values, and for backprop.
 
-        ``"best"`` and ``"device"`` mean adjoint here. ``"backprop"`` isn't supported: ketjet's
-        NumPy kernels can't be traced by autodiff frameworks (ADR-0005 D4).
+        ``"best"`` and ``"device"`` mean adjoint here. ``"backprop"`` is supported on the JAX
+        backend under a JAX interface, for exact results (ADR-0006 D8): JAX differentiates the
+        simulation itself, to any order. The NumPy backend's kernels can't be traced, so it has
+        no backprop (ADR-0005 D4).
         """
         if execution_config is None:
             return True
+        if execution_config.gradient_method == "backprop":
+            return self._backprop_supported(execution_config, circuit)
         if (
             execution_config.gradient_method not in _ADJOINT_METHODS
             or execution_config.derivative_order != 1
@@ -412,8 +431,20 @@ class KetjetQubit(Device):  # type: ignore[misc]  # PennyLane ships no type hint
     def setup_execution_config(
         self, config: ExecutionConfig | None = None, circuit: QuantumScript | None = None
     ) -> ExecutionConfig:
-        """Resolve ``"best"`` and ``"device"`` to adjoint where the device supports it."""
+        """Resolve ``"best"`` and ``"device"`` to adjoint where the device supports it.
+
+        Raises
+        ------
+        DeviceError
+            If backprop is requested with an interface JAX can't trace, such as autograd.
+        """
         config = super().setup_execution_config(config, circuit)
+        if config.gradient_method == "backprop" and config.interface not in _BACKPROP_INTERFACES:
+            raise DeviceError(
+                f'diff_method="backprop" on ketjet.qubit needs a JAX interface, got '
+                f'"{config.interface.value}". Pass interface="jax" with backend="jax", or use '
+                'diff_method="adjoint".'
+            )
         if config.gradient_method not in _ADJOINT_METHODS or not self.supports_derivatives(
             config, circuit
         ):
@@ -459,7 +490,14 @@ class KetjetQubit(Device):  # type: ignore[misc]  # PennyLane ships no type hint
     def execute(
         self, circuits: Sequence[QuantumScript], execution_config: ExecutionConfig | None = None
     ) -> tuple[Any, ...]:
-        """Run each tape on the backend and return PennyLane-shaped results."""
+        """Run each tape on the backend and return PennyLane-shaped results.
+
+        Under ``diff_method="backprop"`` the tape's parameters may be JAX tracers. They then stay
+        in JAX: the circuit runs as a compiled program of its parameters (ADR-0006 D8), and the
+        results are JAX arrays that JAX can differentiate.
+        """
+        if execution_config is not None and execution_config.gradient_method == "backprop":
+            return tuple(self._run_traced(tape) for tape in circuits)
         children = self._rng.spawn(len(circuits))
         return tuple(self._run(tape, rng) for tape, rng in zip(circuits, children, strict=True))
 
@@ -529,6 +567,68 @@ class KetjetQubit(Device):  # type: ignore[misc]  # PennyLane ships no type hint
             combined = Sum([(float(c), obs) for c, obs in zip(weights, observables, strict=True)])
             out[:, b] = self._jacobian(n_wires, operations, [combined], slots)[0]
         return out if batched else out[:, 0]
+
+    def _backprop_supported(
+        self, execution_config: ExecutionConfig, circuit: QuantumScript | None
+    ) -> bool:
+        """Backprop needs a traceable backend and exact results (D8).
+
+        PennyLane asks this before the QNode's interface is known, so the interface is checked
+        in :meth:`setup_execution_config` instead.
+        """
+        if self._backend.name != "jax":
+            return False
+        return circuit is None or not circuit.shots
+
+    def _run_traced(self, tape: QuantumScript) -> Any:
+        """Run an exact tape with JAX-valued parameters through the compiled program."""
+        if tape.shots:
+            raise DeviceError(
+                'diff_method="backprop" on ketjet.qubit needs exact results; samples can\'t be '
+                "differentiated. Use shots=None, or parameter-shift with shots."
+            )
+        from ketjet.backends import jax_backend  # noqa: PLC0415 - JAX is optional
+
+        wire_order = self._wire_order(tape)
+        index = {w: i for i, w in enumerate(wire_order)}
+        gates: list[jax_backend.GateStructure] = []
+        params: list[Any] = []
+        phases: list[Any] = []
+        for op in tape.operations:
+            if isinstance(op, qml.GlobalPhase):
+                phases.append(op.parameters[0])
+                continue
+            gate, wires, controls, values, op_params = _translate(op, index)
+            gates.append((gate, wires, controls, values))
+            params.extend(op_params)
+        n_wires = max(len(wire_order), 1)
+        run = jax_backend._program((n_wires, tuple(gates)), self._dtype)
+        state = run(jax_backend._slot_array(params, self._dtype))
+        if phases:
+            state = state * jax_backend._global_phase(phases, self._dtype)
+        results = tuple(
+            self._traced_measurement(mp, state, index, n_wires) for mp in tape.measurements
+        )
+        return results[0] if len(results) == 1 else results
+
+    @staticmethod
+    def _traced_measurement(mp: Any, state: Any, index: dict[Any, int], n_wires: int) -> Any:
+        """Measure natively where ketjet can; otherwise use PennyLane's interface-agnostic code."""
+        from ketjet.backends import jax_backend  # noqa: PLC0415 - JAX is optional
+
+        if isinstance(mp, ExpectationMP | VarianceMP):
+            try:
+                obs = to_ketjet_observable(mp.obs, index)
+            except (ValueError, TypeError):
+                pass  # traced or complex coefficients, or an untranslatable observable
+            else:
+                if isinstance(mp, ExpectationMP):
+                    return jax_backend.expectation(state, obs)
+                return jax_backend.variance(state, obs)
+        if isinstance(mp, ProbabilityMP) and mp.obs is None:
+            wires = [index[w] for w in mp.wires] if mp.wires else None
+            return jax_backend.probabilities(state, wires)
+        return measure(mp.map_wires(index), state.reshape((2,) * n_wires))
 
     def _wire_order(self, tape: QuantumScript) -> Wires:
         return self.wires if self.wires is not None else tape.wires

@@ -5,6 +5,8 @@ matrices), so comparisons are independent. Import this only after
 ``pytest.importorskip("pennylane")``.
 """
 
+import importlib.util
+import warnings
 from collections.abc import Callable, Sequence
 from typing import Any
 
@@ -16,11 +18,38 @@ from ketjet.operations import Operation
 from tests.random_circuits import random_circuit
 
 __all__ = [
+    "PENNYLANE_JAX_DEPRECATIONS",
+    "PENNYLANE_JAX_ONLY",
+    "PENNYLANE_JAX_WORKS",
     "random_circuit",
     "run_default_qubit",
     "to_pennylane",
     "to_pennylane_observable",
 ]
+
+
+def _pennylane_jax_works() -> bool:
+    """PennyLane 0.45 calls ``jax.core.is_concrete``, which JAX removed in 0.11 (ADR-0006 D1)."""
+    if not importlib.util.find_spec("jax"):
+        return False
+    import jax  # noqa: PLC0415 - JAX is optional
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)  # deprecated on JAX 0.10
+        return hasattr(jax.core, "is_concrete")
+
+
+PENNYLANE_JAX_WORKS = _pennylane_jax_works()
+"""``True`` if PennyLane's JAX code paths work with the installed JAX."""
+
+PENNYLANE_JAX_ONLY = (
+    "PennyLane 0.45's JAX code needs JAX < 0.11 (ADR-0006 D1); run in CI's conformance job"
+)
+"""Skip reason for tests that need :data:`PENNYLANE_JAX_WORKS`."""
+
+PENNYLANE_JAX_DEPRECATIONS = r"ignore:jax\.core\.\w+ is deprecated:DeprecationWarning"
+"""Warning filter for the ``jax.core`` functions PennyLane 0.45 calls, deprecated in JAX 0.10."""
+
 
 _PL_BASE: dict[str, Callable[..., Any]] = {
     "I": lambda w, p: qml.Identity(w[0]),

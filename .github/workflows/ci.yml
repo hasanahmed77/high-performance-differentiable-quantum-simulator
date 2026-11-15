@@ -109,7 +109,11 @@ jobs:
       - name: NumPy backend, shot mode (10,000 shots)
         run: uv run --no-sync pl-device-test --device=ketjet.qubit --analytic=False --shots=10000 -rfs
       - name: JAX backend, exact mode
-        run: uv run --no-sync pl-device-test --device=ketjet.qubit --device-kwargs backend=jax -rfs
+        # The autograd backprop tests are deselected: JAX can't trace autograd values, and
+        # PennyLane asks about backprop before it knows the interface (docs/pennylane.md).
+        run: >-
+          uv run --no-sync pl-device-test --device=ketjet.qubit --device-kwargs backend=jax
+          -k "not (test_gradients_autograd and backprop)" -rfs
         env:
           JAX_ENABLE_X64: "true"  # complex128 needs JAX's 64-bit mode (ADR-0006 D5)
       - name: JAX backend, shot mode (10,000 shots)
@@ -118,6 +122,13 @@ jobs:
           --analytic=False --shots=10000 -rfs
         env:
           JAX_ENABLE_X64: "true"
+      - name: QNodes under PennyLane's JAX interface (QS-608)
+        # The main suite runs the latest JAX, where PennyLane 0.45's JAX interface fails
+        # (ADR-0006 D1), so these run here, on JAX 0.10.
+        run: >-
+          uv run --no-sync pytest -p no:cacheprovider -rfs
+          tests/integration/test_pennylane_jax_interface.py
+          tests/integration/test_pennylane_backprop.py
 
   build:
     name: Build and smoke-test distributions
