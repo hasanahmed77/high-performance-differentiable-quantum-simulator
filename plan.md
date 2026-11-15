@@ -584,7 +584,7 @@ docs deployed, a sprint report and a retro. Test focus lists the test types that
 
 ### Sprint 5: JAX backend I
 **Goal:** JAX backend at parity with NumPy, jit-compiled.
-**Stories:** QS-601, 602, 603, 604, 608, 110, 112
+**Stories:** QS-601, 602, 603, 604, 608, 110, 112, 507 (stretch)
 **Test focus:** Cross-backend parametrized suite; trace-count tests (no recompiles); JAX interface integration tests.
 **Demo:** jit'd circuit vs NumPy timing.
 **Environment:** Mac; GPU workstation set up at sprint end (QS-112) so Sprint 6 starts unblocked.
@@ -729,7 +729,7 @@ All decisions were settled by the PO on 2026-11-09.
 | D1 | PyPI package name | ✅ **`ketjet`** (`import ketjet as kj`; device `ketjet.qubit`) | Unique and searchable; "ket" is quantum state notation and "jet" signals speed. Available on PyPI as of 2026-11-09, to be reserved in Sprint 0 (QS-111). |
 | D2 | Docs tool | ✅ **MkDocs Material + mkdocstrings** | Modern, Markdown-based, fast to iterate |
 | D3 | License | ✅ **Apache-2.0** | Matches PennyLane; includes a patent grant |
-| D4 | Supported Python | ✅ **3.12–3.15** (revised 2026-11-09 in Sprint 0) | NumPy ≥2.5 and JAX ≥0.12 require Python ≥3.12; follows SPEC 0. PennyLane-dependent tests are skipped on 3.15 until PennyLane supports it. |
+| D4 | Supported Python | ✅ **3.12–3.15** (revised 2026-11-09 in Sprint 0) | NumPy ≥2.5 and the latest JAX (0.12) require Python ≥3.12; follows SPEC 0. The JAX extra is `jax>=0.10`, because PennyLane 0.45 needs JAX <0.11 (ADR-0006 D1, revised 2026-11-15). PennyLane-dependent tests are skipped on 3.15 until PennyLane supports it. |
 | D5 | GPU access | ✅ **RTX 4060 workstation (WSL2) + free-tier Kaggle/Colab T4s** | Zero budget (§1, §4.5) |
 | D6 | Sprint length | ✅ **Goal-based sprints, not fixed-length** | Work proceeds at maximum daily pace; a sprint closes when its goal and DoD are met (§4.2) |
 | D7 | Multi-GPU (E10) | ✅ **Kept as stretch** | Most impressive piece; scheduled last so it cannot block anything |

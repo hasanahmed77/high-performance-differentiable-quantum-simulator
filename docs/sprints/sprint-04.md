@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | In review |
+| **Status** | Done: accepted by the PO in #134 |
 | **Review** | 2026-11-12 |
 | **Started** | 2026-11-11 |
 | **Milestone** | `Sprint 04 – PennyLane device` |
