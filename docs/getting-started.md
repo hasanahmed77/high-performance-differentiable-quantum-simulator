@@ -141,10 +141,29 @@ gates fills two slots. A bound circuit and its symbolic template share one compi
 structures stay compiled. Compiling a circuit of several hundred gates takes seconds, so a circuit that runs only
 once is faster on NumPy.
 
-**What's not there yet.** `jax.grad` through a compiled circuit, batching and GPU execution are the next steps on
-the [roadmap](https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator#roadmap). Its
-`adjoint_jacobian` returns the same values as NumPy's but uses reverse-mode autodiff, so its memory grows with
-circuit depth.
+**Gradients by backprop.** A compiled circuit is a pure JAX function, so `jax.grad`, `jax.jacrev` and
+`jax.jit` apply to it directly. `parameter_map(circuit)` turns one value per symbol, in `circuit.parameters`
+order, into the slot array; a symbol used by several gates gets the sum of their gradients:
+
+```python
+import jax
+from ketjet.backends.jax_backend import compile_circuit, expectation, parameter_map
+
+run, to_slots = compile_circuit(ansatz), parameter_map(ansatz)
+
+def energy(x):
+    return expectation(run(to_slots(x)), H)
+
+step = jax.jit(lambda x: x - 0.5 * jax.grad(energy)(x))   # one compilation for every step
+```
+
+The gradients equal `ketjet.gradients`' adjoint and parameter-shift results. Backprop stores the forward pass, so
+its memory grows with circuit depth; the NumPy backend's adjoint method doesn't, which matters for deep circuits.
+
+**What's not there yet.** Batching with `jax.vmap` and GPU execution are the next steps on the
+[roadmap](https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator#roadmap). The JAX
+backend's `adjoint_jacobian` returns the same values as NumPy's but uses reverse-mode autodiff, so its memory also
+grows with circuit depth.
 
 ## Next steps
 

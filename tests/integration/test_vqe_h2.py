@@ -71,3 +71,33 @@ def test_hamiltonian_matches_pennylane_qchem(page: tuple[str, dict[str, Any], li
     np.testing.assert_allclose(
         ns["H"].matrix(4), qml.matrix(hamiltonian, wire_order=range(4)), atol=1e-10
     )
+
+
+def test_vqe_on_the_jax_backend_with_a_compiled_gradient_step(
+    page: tuple[str, dict[str, Any], list[str]],
+) -> None:
+    """Sprint 5 integration: the same VQE by backprop, one jit-compiled step, to the FCI energy."""
+    jax = pytest.importorskip("jax")
+    from ketjet.backends.jax_backend import (  # noqa: PLC0415 - JAX is optional
+        compile_circuit,
+        expectation,
+        parameter_map,
+    )
+
+    _, ns, _ = page
+    ansatz, hamiltonian = ns["ansatz"], ns["H"]
+    run, to_slots = compile_circuit(ansatz), parameter_map(ansatz)
+
+    def energy(x: Any) -> Any:
+        return expectation(run(to_slots(x)), hamiltonian)
+
+    def descend(x: Any) -> Any:
+        return x - 0.5 * jax.grad(energy)(x)
+
+    step = jax.jit(descend)
+
+    x = jax.numpy.array([np.pi])  # Hartree-Fock, as on the page
+    for _ in range(40):
+        x = step(x)
+    assert abs(float(energy(x)) - ns["exact"]) < 1e-12
+    assert float(x[0]) == pytest.approx(ns["values"]["theta"], abs=1e-10)  # same path as adjoint

@@ -16,7 +16,11 @@ collect_ignore = (
     else ["pennylane_support.py", "regression/generate_golden.py"]
 )
 if not importlib.util.find_spec("jax"):
-    collect_ignore += ["unit/test_jax_backend.py", "unit/test_compile_circuit.py"]
+    collect_ignore += [
+        "unit/test_jax_backend.py",
+        "unit/test_compile_circuit.py",
+        "unit/test_backprop.py",
+    ]
 
 
 @pytest.fixture(params=["numpy", "jax"])
