@@ -44,7 +44,7 @@ from ketjet.measurements import (
     sample_from_probs,
 )
 from ketjet.observables import Hermitian, Observable, Pauli, Prod, Sum, _check_in_state
-from ketjet.operations import Operation
+from ketjet.operations import Operation, Parameter
 from ketjet.statevector import (
     ComplexDType,
     DTypeLike,
@@ -69,6 +69,7 @@ __all__ = [
     "compile_circuit",
     "expectation",
     "gate_matrix",
+    "parameter_map",
     "parameter_values",
     "probabilities",
     "variance",
@@ -416,9 +417,11 @@ def circuit_structure(circuit: "Circuit") -> Structure:
     >>> circuit_structure(bound) == circuit_structure(symbolic)
     True
     """
-    return circuit.n_wires, tuple(
-        (op.gate, op.wires, op.controls, op.control_values) for op in circuit.operations
-    )
+    return _structure(circuit.n_wires, circuit.operations)
+
+
+def _structure(n_wires: int, operations: Iterable[Operation]) -> Structure:
+    return n_wires, tuple((op.gate, op.wires, op.controls, op.control_values) for op in operations)
 
 
 def parameter_values(circuit: "Circuit") -> npt.NDArray[np.float64]:
@@ -562,6 +565,53 @@ def compile_circuit(circuit: "Circuit", dtype: DTypeLike = np.complex128) -> Com
     )
 
 
+def parameter_map(circuit: "Circuit") -> Callable[[npt.ArrayLike | jax.Array], jax.Array]:
+    """Return the function from ``circuit``'s symbol values to the slot array it compiles to.
+
+    The function takes one value per symbol, in :attr:`Circuit.parameters
+    <ketjet.circuit.Circuit.parameters>` order, and returns the :func:`compile_circuit` slot
+    array: a symbol's value fills every slot that holds it, and numeric parameters stay as they
+    are. It is a gather, so JAX differentiates through it, and the gradient of a shared symbol is
+    the sum over its slots: the chain rule that :mod:`ketjet.gradients` applies (ADR-0004 D1).
+
+    Examples
+    --------
+    >>> import jax
+    >>> from ketjet.circuit import Circuit
+    >>> from ketjet.observables import Z
+    >>> from ketjet.operations import Parameter
+    >>> theta = Parameter("theta")
+    >>> circuit = Circuit(1).rz(0.5, 0).ry(theta, 0).ry(theta, 0)  # <Z> = cos(2 theta)
+    >>> to_slots, run = parameter_map(circuit), compile_circuit(circuit)
+    >>> to_slots([0.3]).tolist()
+    [0.5, 0.3, 0.3]
+    >>> energy = lambda x: expectation(run(to_slots(x)), Z(0))
+    >>> round(float(jax.grad(energy)(jax.numpy.array([0.3]))[0]), 6)  # -2 sin(0.6)
+    -1.129285
+    """
+    symbols = {p: k for k, p in enumerate(circuit.parameters)}
+    n_symbols = len(symbols)
+    slots = [p for op in circuit.operations for p in op.params]
+    gather = np.array([symbols[p] if isinstance(p, Parameter) else 0 for p in slots], dtype=int)
+    is_symbol = np.array([isinstance(p, Parameter) for p in slots], dtype=bool)
+    numeric = np.array([0.0 if isinstance(p, Parameter) else p for p in slots], dtype=np.float64)
+
+    def to_slots(values: npt.ArrayLike | jax.Array) -> jax.Array:
+        x = jnp.asarray(values)
+        if x.shape != (n_symbols,):
+            raise ValueError(
+                f"The circuit has {n_symbols} symbol(s), so it takes that many values as a flat "
+                f"array, got shape {x.shape}."
+            )
+        if not slots:
+            return jnp.zeros(0, dtype=x.dtype)
+        if not n_symbols:
+            return jnp.asarray(numeric, dtype=x.dtype)
+        return jnp.where(is_symbol, x[gather], jnp.asarray(numeric, dtype=x.dtype))
+
+    return to_slots
+
+
 # --------------------------------------------------------------------------- backend
 
 
@@ -662,7 +712,9 @@ class JaxBackend:
     ) -> npt.NDArray[np.float64]:
         """Return ``∂⟨O_m⟩/∂x_s`` for the ``trainable`` slots, by reverse-mode autodiff.
 
-        Same arguments, shape and values as :func:`ketjet.adjoint.adjoint_jacobian`.
+        Same arguments, shape and values as :func:`ketjet.adjoint.adjoint_jacobian`. It runs
+        the program :func:`compile_circuit` would build, so circuits of one structure share a
+        compilation here too.
 
         Notes
         -----
@@ -687,29 +739,19 @@ class JaxBackend:
         if not trainable or not observables:
             return jac
 
-        values = [op._numeric_params() for op in ops]
-        # A slot named twice is differentiated once, and its column is repeated.
-        column = {slot: k for k, slot in enumerate(dict.fromkeys(trainable))}
+        # Differentiate the compiled program with respect to its whole slot array, then pick the
+        # trainable columns. Reverse mode costs one backward pass per observable however many
+        # slots there are, and a slot named twice simply repeats its column.
+        structure = _structure(n_wires, ops)
+        run = _program(structure, complex_dtype)
         real_dtype = np.float64 if complex_dtype == np.complex128 else np.float32
-        theta = jnp.asarray([values[i][j] for i, j in column], dtype=real_dtype)
+        x = jnp.asarray([v for op in ops for v in op._numeric_params()], dtype=real_dtype)
+        offsets = np.cumsum([0] + [op.spec.num_params for op in ops])
 
-        def measure(x: jax.Array) -> jax.Array:
-            state = self.zero_state(n_wires, complex_dtype)
-            for i, op in enumerate(ops):
-                params = [
-                    x[column[i, j]] if (i, j) in column else value
-                    for j, value in enumerate(values[i])
-                ]
-                state = apply_gate(
-                    state,
-                    op.gate,
-                    params,
-                    op.wires,
-                    controls=op.controls,
-                    control_values=op.control_values,
-                )
+        def measure(params: jax.Array) -> jax.Array:
+            state = run(params)
             return jnp.stack([expectation(state, obs) for obs in observables])
 
-        unique = np.asarray(jax.jacrev(measure)(theta), dtype=np.float64)
-        jac[:] = unique[:, [column[slot] for slot in trainable]]
+        full = np.asarray(jax.jacrev(measure)(x), dtype=np.float64)
+        jac[:] = full[:, [offsets[i] + j for i, j in trainable]]
         return jac
