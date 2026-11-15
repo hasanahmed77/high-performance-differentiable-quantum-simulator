@@ -13,7 +13,7 @@
 |---|---|---|---|---|
 | QS-601 | Spike and ADR-0006: the JAX backend design | 2 | n/a | #135 |
 | QS-602 | `JaxBackend` passes the full cross-backend suite; `ketjet[jax]` extra; `pl-device-test` on the JAX backend | 5 | ADR-0006 | #136 |
-| QS-603 | `compile_circuit`: one `jax.jit` compilation per circuit structure | 3 | QS-602 | |
+| QS-603 | `compile_circuit`: one `jax.jit` compilation per circuit structure | 3 | QS-602 | #137 |
 | QS-604 | `jax.grad` through the simulator (backprop) | 3 | QS-603 | |
 | QS-608 | PennyLane's JAX interface end to end: `backend="jax"`, `diff_method="backprop"`, `jax.jit` | 3 | QS-604 | |
 | QS-110 | Dependabot, CodeQL and pip-audit | 2 | n/a | |
