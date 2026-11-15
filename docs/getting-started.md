@@ -5,6 +5,14 @@
 - Python 3.12–3.15
 - Linux, macOS or Windows
 
+| Dependency | Supported | Needed for |
+|---|---|---|
+| NumPy | 2.1 and later | always |
+| PennyLane | 0.44.1 – 0.45.x | `ketjet[pennylane]` |
+| JAX | 0.10 and later; below 0.11 with PennyLane's JAX interface | `ketjet[jax]` |
+
+CI tests both ends of every range: the lowest versions on Python 3.12, and the latest releases daily.
+
 ## Install
 
 ```bash
