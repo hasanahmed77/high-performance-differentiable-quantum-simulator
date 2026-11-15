@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Planned |
+| **Status** | In progress |
 | **Started** | 2026-11-15 |
 | **Milestone** | `Sprint 05 – JAX backend I` |
 | **Sprint goal** | A user can run any ketjet circuit on a JAX backend that matches the NumPy oracle, compiles once per circuit structure, and is differentiable with `jax.grad`, natively and through PennyLane's JAX interface. |
@@ -11,7 +11,7 @@
 
 | ID | Story | Pts | Depends on | PR |
 |---|---|---|---|---|
-| QS-601 | Spike and ADR-0006: the JAX backend design | 2 | n/a | this PR |
+| QS-601 | Spike and ADR-0006: the JAX backend design | 2 | n/a | #135 |
 | QS-602 | `JaxBackend` passes the full cross-backend suite; `ketjet[jax]` extra; `pl-device-test` on the JAX backend | 5 | ADR-0006 | |
 | QS-603 | `compile_circuit`: one `jax.jit` compilation per circuit structure | 3 | QS-602 | |
 | QS-604 | `jax.grad` through the simulator (backprop) | 3 | QS-603 | |
@@ -28,7 +28,7 @@ QS-507 is a stretch goal. It moved up because the spike found a version boundary
 is independent and can go in while a JAX PR waits on CI. QS-112 comes last, as plan.md §8 says, so Sprint 6 starts
 with a working GPU machine.
 
-**Scope changes in this plan (need PO approval):**
+**Scope changes in this plan (approved by the PO in #135):**
 
 - **The JAX range is `jax>=0.10`, not `≥0.12`** (ADR-0006 D1, revises plan.md D4). PennyLane 0.45.1, the latest
   release, fails under its JAX interface with JAX ≥0.11. With `≥0.12`, QS-608 couldn't be delivered until

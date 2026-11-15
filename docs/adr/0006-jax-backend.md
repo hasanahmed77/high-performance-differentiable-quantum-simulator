@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Proposed |
+| **Status** | Accepted (approved by the PO on 2026-11-15 in #135) |
 | **Date** | 2026-11-15 |
 | **Deciders** | Product Owner / Architect |
 | **Related stories** | QS-601 (this spike), QS-602, QS-603, QS-604, QS-608; later QS-605 (vmap), QS-606 (adjoint as `custom_vjp`), QS-607 (GPU), QS-507 (version range) |
