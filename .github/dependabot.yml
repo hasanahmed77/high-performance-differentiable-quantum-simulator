@@ -1,0 +1,44 @@
+# Dependency updates (QS-110). Each ecosystem opens at most one grouped PR a week for routine
+# updates, plus grouped security updates as soon as an advisory is published.
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    # Refresh uv.lock within the ranges in pyproject.toml, never widen them. The upper bounds
+    # (pennylane<0.46, and jax<0.11 for the conformance group) are deliberate: lifting one is a
+    # reviewed change with a compatibility CI run (QS-507, ADR-0006 D1).
+    versioning-strategy: lockfile-only
+    cooldown:
+      default-days: 7 # let a new release settle (and get yanked, if it's bad) before adopting it
+    groups:
+      python:
+        applies-to: version-updates
+        patterns: ["*"]
+      python-security:
+        applies-to: security-updates
+        patterns: ["*"]
+    labels: [dependencies, type:chore, skip-changelog]
+    commit-message:
+      prefix: "build(deps)"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    # Actions are pinned by commit SHA with the version in a comment; Dependabot updates both.
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+    labels: [dependencies, type:chore, skip-changelog]
+    commit-message:
+      prefix: "ci(deps)"

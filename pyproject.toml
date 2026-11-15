@@ -65,6 +65,7 @@ lint = [
     "mypy>=2.0",
     "pre-commit>=4.0",
     "towncrier>=25.8",
+    "pip-audit>=2.10",
 ]
 dev = [
     { include-group = "test" },

@@ -33,6 +33,18 @@ Report them privately through GitHub's
 
 Reporters are credited in the security advisory unless they prefer to remain anonymous.
 
+## How dependencies and code are checked
+
+| Check | When | Blocks a merge |
+|---|---|---|
+| `pip-audit` on every locked dependency (`uv.lock`, both resolutions), against PyPI and OSV advisories | every PR and push, and weekly | yes, on any known vulnerability |
+| CodeQL (`security-extended` queries) on the Python code and the GitHub Actions workflows | every PR and push, and weekly | yes, on high or critical severity (CVSS ≥ 7.0) |
+| Dependabot: grouped weekly updates of `uv.lock` and of the pinned GitHub Actions, and security updates as soon as an advisory is published | weekly, and on advisories | n/a: it opens PRs, which pass the same checks |
+
+Dependabot refreshes `uv.lock` within the version ranges in `pyproject.toml` and never widens them. Raising an
+upper bound, such as PennyLane's, is a reviewed change with its own compatibility run. New releases wait seven days
+before Dependabot proposes them.
+
 ## Scope
 
 In scope: the `ketjet` package, its native extensions, and the build and release pipeline in this repository.
