@@ -1,0 +1,65 @@
+name: Compatibility (latest releases)
+
+# The newest releases of every dependency that pyproject.toml allows, resolved afresh and ignoring
+# uv.lock (QS-507). The required CI covers the locked versions and the minimum ones; this is the
+# early warning for upstream releases. It isn't a required check, because a new upstream release
+# shouldn't block unrelated PRs. A failure here is fixed in its own PR, often by a Dependabot one.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "41 4 * * *" # daily, 04:41 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compatibility-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  UV_FROZEN: "0" # resolve afresh; these jobs' lockfiles are thrown away
+  FORCE_COLOR: "1"
+
+jobs:
+  latest:
+    name: Latest releases (py3.14)
+    # Python 3.14 is the newest version PennyLane supports; on 3.15 its tests skip.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: "3.14"
+      - run: uv sync --upgrade --group test
+      - name: Resolved versions
+        run: uv pip list | grep -iE '^(numpy|scipy|jax|jaxlib|pennylane|pytest|hypothesis) '
+      - run: uv run --no-sync pytest -p no:cacheprovider
+
+  latest-pennylane-jax:
+    name: Latest PennyLane with the latest JAX it supports
+    # PennyLane 0.45's JAX interface needs JAX < 0.11 (ADR-0006 D1), so the conformance group
+    # pins it; this resolves everything else to the newest. When a PennyLane release supports a
+    # newer JAX, the main suite's PennyLane-JAX tests stop skipping and the pin can be lifted.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: "3.13"
+      - run: uv sync --upgrade --no-default-groups --group conformance
+      - name: Resolved versions
+        run: uv pip list | grep -iE '^(numpy|jax|jaxlib|pennylane) '
+      - name: QNodes under PennyLane's JAX interface
+        run: >-
+          uv run --no-sync pytest -p no:cacheprovider -rfs
+          tests/integration/test_pennylane_jax_interface.py
+          tests/integration/test_pennylane_backprop.py
+      - name: PennyLane device suite, JAX backend
+        run: >-
+          uv run --no-sync pl-device-test --device=ketjet.qubit --device-kwargs backend=jax
+          -k "not (test_gradients_autograd and backprop)" -rfs
+        env:
+          JAX_ENABLE_X64: "true"

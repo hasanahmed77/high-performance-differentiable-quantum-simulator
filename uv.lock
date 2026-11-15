@@ -897,7 +897,7 @@ test = [
 requires-dist = [
     { name = "jax", marker = "extra == 'jax'", specifier = ">=0.10" },
     { name = "numpy", specifier = ">=2.1" },
-    { name = "pennylane", marker = "extra == 'pennylane'", specifier = ">=0.44,<0.46" },
+    { name = "pennylane", marker = "extra == 'pennylane'", specifier = ">=0.44.1,<0.46" },
 ]
 provides-extras = ["jax", "pennylane"]
 
@@ -905,7 +905,7 @@ provides-extras = ["jax", "pennylane"]
 conformance = [
     { name = "flaky", specifier = ">=3.8" },
     { name = "jax", specifier = ">=0.10,<0.11" },
-    { name = "pennylane", specifier = ">=0.44,<0.46" },
+    { name = "pennylane", specifier = ">=0.44.1,<0.46" },
     { name = "pytest", specifier = ">=9.0" },
     { name = "pytest-mock", specifier = ">=3.14" },
 ]
@@ -914,7 +914,7 @@ dev = [
     { name = "hypothesis", specifier = ">=6.140" },
     { name = "jax", specifier = ">=0.10" },
     { name = "mypy", specifier = ">=2.0" },
-    { name = "pennylane", specifier = ">=0.44,<0.46" },
+    { name = "pennylane", specifier = ">=0.44.1,<0.46" },
     { name = "pip-audit", specifier = ">=2.10" },
     { name = "pre-commit", specifier = ">=4.0" },
     { name = "pytest", specifier = ">=9.0" },
@@ -937,7 +937,7 @@ test = [
     { name = "diff-cover", specifier = ">=9.0" },
     { name = "hypothesis", specifier = ">=6.140" },
     { name = "jax", specifier = ">=0.10" },
-    { name = "pennylane", specifier = ">=0.44,<0.46" },
+    { name = "pennylane", specifier = ">=0.44.1,<0.46" },
     { name = "pytest", specifier = ">=9.0" },
     { name = "pytest-cov", specifier = ">=7.0" },
 ]

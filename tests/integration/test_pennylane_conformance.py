@@ -16,6 +16,11 @@ from pennylane import numpy as pnp  # noqa: E402
 
 from ketjet.pennylane import _to_eigenbasis  # noqa: E402
 
+# PennyLane < 0.45 decomposes a 3-qubit QubitUnitary to about 1e-8 (measured: 4.5e-8 on 0.44.1,
+# 4e-14 on 0.45.1), and the matrix fallback goes through that decomposition. Not ketjet's error.
+_PL_VERSION = tuple(int(p) for p in qml.__version__.split(".")[:2])
+MATRIX_FALLBACK_ATOL = 1e-10 if _PL_VERSION >= (0, 45) else 1e-7
+
 H = np.array([[1.02789352, 1.61296440 - 0.3498192j], [1.61296440 + 0.3498192j, 1.23920938]])
 
 
@@ -137,7 +142,7 @@ def test_operations_without_a_decomposition_run_from_their_matrix(make: Any) -> 
         return qml.state()
 
     ours, theirs = _both(qfunc, wires=4)
-    np.testing.assert_allclose(ours, theirs, atol=1e-10)
+    np.testing.assert_allclose(ours, theirs, atol=MATRIX_FALLBACK_ATOL)
 
 
 @pytest.mark.parametrize("method", ["adjoint", "parameter-shift"])

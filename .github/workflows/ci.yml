@@ -103,6 +103,26 @@ jobs:
         if: github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest' && matrix.python == '3.13'
         run: uv run diff-cover coverage.xml --compare-branch=origin/${{ github.base_ref }} --fail-under=90
 
+  minimum-versions:
+    name: Minimum supported versions (py3.12)
+    # Every direct dependency at the lowest version pyproject.toml allows, on the oldest supported
+    # Python: numpy 2.1, PennyLane 0.44.1, JAX 0.10.0, and the test tools' floors (QS-507). It
+    # proves the lower bounds are real. Transitive dependencies resolve to their latest versions,
+    # as they would for a user who pins only ketjet's requirements.
+    runs-on: ubuntu-latest
+    env:
+      UV_FROZEN: "0" # resolve afresh; this job's lockfile is thrown away
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: "3.12"
+      - run: uv sync --resolution lowest-direct --group test
+      - name: Resolved versions
+        run: uv pip list | grep -iE '^(numpy|scipy|jax|jaxlib|pennylane|pytest|hypothesis) '
+      # --no-sync: a plain `uv run` would re-resolve to the highest versions.
+      - run: uv run --no-sync pytest -p no:cacheprovider
+
   conformance:
     name: PennyLane device suite (pl-device-test)
     # PennyLane's own device tests, in exact and in shot mode, on every backend (ADR-0005 D6,
@@ -172,7 +192,7 @@ jobs:
     name: CI success
     # Single required status check for branch protection; fails if any job failed or was cancelled.
     if: always()
-    needs: [lint, changelog, audit, types, test, conformance, build]
+    needs: [lint, changelog, audit, types, test, minimum-versions, conformance, build]
     runs-on: ubuntu-latest
     steps:
       - name: Check all jobs passed

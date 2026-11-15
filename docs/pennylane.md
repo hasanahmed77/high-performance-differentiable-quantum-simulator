@@ -178,7 +178,11 @@ replaces the development environment. Run `uv sync` afterwards to get that back.
 
 ## Limitations
 
-- **No backprop** yet, on either backend (see [Gradients](#gradients)).
+- **Backprop on the JAX backend only**, with a JAX interface and exact results (see [Backprop](#backprop)).
 - **Batched parameters** run as a loop of circuits (PennyLane's `broadcast_expand`), until native broadcasting.
 - **Mid-circuit measurements** are deferred: each one becomes an extra wire.
-- **Supported PennyLane versions:** 0.44 and 0.45. Newer versions are added once CI passes on them.
+- **Supported PennyLane versions:** 0.44.1 to 0.45.x. CI runs the minimum and the latest. 0.44.0 isn't supported:
+  it can't be imported with current versions of its own dependency `diastatic-malt`, which PennyLane fixed in 0.44.1.
+  Newer versions are added once CI passes on them.
+- **Operations that run from their matrix** (see [Operations](#operations)) are accurate to about 1e-7 on PennyLane
+  0.44, whose `QubitUnitary` decomposition is less precise for three or more qubits, and to 1e-10 on 0.45.

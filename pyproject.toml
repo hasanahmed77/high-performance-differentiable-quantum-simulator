@@ -30,7 +30,7 @@ classifiers = [
 dependencies = ["numpy>=2.1"]
 
 [project.optional-dependencies]
-pennylane = ["pennylane>=0.44,<0.46"]
+pennylane = ["pennylane>=0.44.1,<0.46"]
 jax = ["jax>=0.10"]
 
 [project.entry-points."pennylane.plugins"]
@@ -48,12 +48,12 @@ test = [
     "pytest-cov>=7.0",
     "hypothesis>=6.140",
     "diff-cover>=9.0",
-    "pennylane>=0.44,<0.46",
+    "pennylane>=0.44.1,<0.46",
     "jax>=0.10",
 ]
 conformance = [
     # PennyLane's own device test suite (pl-device-test) needs these; kept out of the main suite.
-    "pennylane>=0.44,<0.46",
+    "pennylane>=0.44.1,<0.46",
     "pytest>=9.0",
     "pytest-mock>=3.14",
     "flaky>=3.8",
