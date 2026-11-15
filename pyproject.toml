@@ -31,6 +31,7 @@ dependencies = ["numpy>=2.1"]
 
 [project.optional-dependencies]
 pennylane = ["pennylane>=0.44,<0.46"]
+jax = ["jax>=0.10"]
 
 [project.entry-points."pennylane.plugins"]
 "ketjet.qubit" = "ketjet.pennylane:KetjetQubit"
@@ -48,6 +49,7 @@ test = [
     "hypothesis>=6.140",
     "diff-cover>=9.0",
     "pennylane>=0.44,<0.46",
+    "jax>=0.10",
 ]
 conformance = [
     # PennyLane's own device test suite (pl-device-test) needs these; kept out of the main suite.
@@ -55,6 +57,8 @@ conformance = [
     "pytest>=9.0",
     "pytest-mock>=3.14",
     "flaky>=3.8",
+    # PennyLane 0.45 fails under its JAX interface with JAX >= 0.11 (ADR-0006 D1).
+    "jax>=0.10,<0.11",
 ]
 lint = [
     "ruff>=0.17",
@@ -73,6 +77,9 @@ docs = [
 
 [tool.uv]
 default-groups = ["dev"]
+# The main suite tests the latest JAX; the conformance suite needs the last JAX that PennyLane's
+# JAX interface supports (ADR-0006 D1). The two groups are never installed together.
+conflicts = [[{ group = "test" }, { group = "conformance" }], [{ group = "dev" }, { group = "conformance" }]]
 
 # --------------------------------------------------------------------------- build
 [tool.hatch.version]

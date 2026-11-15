@@ -34,6 +34,13 @@ The reference is generated from the docstrings in the source code, so it always 
 
 ::: ketjet.backends.numpy_backend
 
+::: ketjet.backends.jax_backend
+
+::: ketjet.backends
+    options:
+      members:
+        - get_backend
+
 ## Observables
 
 ::: ketjet.observables

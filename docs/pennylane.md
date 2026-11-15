@@ -34,7 +34,26 @@ PennyLane is an optional extra: `import ketjet` on its own never imports it.
 | `shots` | `None` | Default shots; prefer `qml.set_shots` on the QNode, as PennyLane recommends. `None` is exact. |
 | `seed` | `None` | `int` or `numpy.random.Generator`. A seeded device gives reproducible samples. |
 | `c_dtype` | `"complex128"` | Precision: `"complex128"` or `"complex64"`. |
-| `backend` | `NumPyBackend()` | The ketjet backend the circuit runs on. |
+| `backend` | `"numpy"` | The ketjet backend the circuit runs on: `"numpy"`, `"jax"` or a backend instance. See [Backends](#backends). |
+
+## Backends
+
+`backend="jax"` runs the simulation on ketjet's JAX backend (`pip install "ketjet[jax]"`):
+
+```python
+import jax
+
+jax.config.update("jax_enable_x64", True)   # needed for the default c_dtype, complex128
+dev = qml.device("ketjet.qubit", wires=2, backend="jax")
+```
+
+- Results, gradients and seeded samples match the NumPy backend.
+- complex128 needs JAX's 64-bit mode. Without it the device raises an error that names the setting; `c_dtype="complex64"`
+  works either way.
+- PennyLane 0.45's JAX interface (`interface="jax"`) works with JAX below 0.11 only. The ketjet backend itself also
+  runs on later versions.
+- `diff_method="adjoint"` on the JAX backend gives the same gradients, but its memory grows with circuit depth for
+  now. Keep the NumPy backend for deep circuits.
 
 ## Operations
 
@@ -82,17 +101,18 @@ expectation values is **one** backward pass, however many expectation values the
 **Backprop.** `diff_method="backprop"` raises `QuantumFunctionError: Device ... does not support backprop`.
 Backprop needs the simulation itself to be traceable by an autodiff framework, and ketjet's NumPy reference kernels
 deliberately aren't. **Use `diff_method="adjoint"` instead:** it gives the same gradients, exactly, with much less
-memory for deep circuits. Backprop through ketjet comes with its JAX backend.
+memory for deep circuits. Backprop on the device is planned for the JAX backend (QS-608).
 
 ## Conformance
 
 PennyLane's own device test suite, `pl-device-test`, runs on every pull request in exact mode and in shot mode
-(10,000 shots). With PennyLane 0.45:
+(10,000 shots), on the NumPy backend and on the JAX backend. With PennyLane 0.45 and JAX 0.10, the results are the
+same on both backends:
 
 | Mode | Passed | Skipped | Expected failures | Failed |
 |---|---|---|---|---|
-| Exact | 380 | 37 | 9 | 0 |
-| Shots | 365 | 52 | 9 | 0 |
+| Exact | 389 | 45 | 9 | 0 |
+| Shots | 374 | 60 | 9 | 0 |
 
 The expected failures are marked as such by PennyLane's suite itself. Every skip is one of these:
 
@@ -100,22 +120,26 @@ The expected failures are marked as such by PennyLane's suite itself. Every skip
 |---|---|
 | Tests for the other mode (10 exact, 31 shots) | Sampling tests skip in exact mode; analytic-only tests skip with shots. Each runs in the other mode. |
 | Tests for PennyLane's old device interface (11 in each mode) | `ketjet.qubit` uses the current `Device` API. |
-| Gradient tests for one specific `diff_method` (9 exact, 3 shots) | Mostly backprop, which isn't supported yet (see [Gradients](#gradients)); the rest run under the method they target. |
+| Gradient tests for one specific `diff_method` (18 exact, 12 shots) | Mostly backprop, which isn't supported yet (see [Gradients](#gradients)); the rest run under the method they target. This includes the suite's JAX gradient tests, which run with JAX installed. |
 | `QubitDensityMatrix`, `QutritBasisState` (3 in each mode) | Mixed-state and qutrit operations; `ketjet.qubit` simulates pure qubit states. |
-| JAX and Torch gradient tests (2 in each mode) | Not installed in the conformance job. JAX is tested with the JAX backend: PennyLane 0.45 doesn't yet support JAX 0.12. |
+| Torch gradient tests (1 in each mode) | Torch isn't installed in the conformance job. |
 | Single-condition checks (2 in each mode) | Conditions that don't apply, e.g. "no warning is raised when shots=None". |
 
 To run the suite yourself:
 
 ```bash
-uv sync --group conformance
-uv run pl-device-test --device=ketjet.qubit
-uv run pl-device-test --device=ketjet.qubit --analytic=False --shots=10000
+uv sync --no-default-groups --group conformance
+uv run --no-sync pl-device-test --device=ketjet.qubit
+uv run --no-sync pl-device-test --device=ketjet.qubit --analytic=False --shots=10000
+JAX_ENABLE_X64=true uv run --no-sync pl-device-test --device=ketjet.qubit --device-kwargs backend=jax
 ```
+
+The conformance environment pins JAX below 0.11, the newest version PennyLane 0.45's JAX interface works with, so it
+replaces the development environment. Run `uv sync` afterwards to get that back.
 
 ## Limitations
 
-- **No backprop**, until the JAX backend (see [Gradients](#gradients)).
+- **No backprop** yet, on either backend (see [Gradients](#gradients)).
 - **Batched parameters** run as a loop of circuits (PennyLane's `broadcast_expand`), until native broadcasting.
 - **Mid-circuit measurements** are deferred: each one becomes an extra wire.
 - **Supported PennyLane versions:** 0.44 and 0.45. Newer versions are added once CI passes on them.

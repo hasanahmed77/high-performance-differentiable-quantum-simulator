@@ -30,6 +30,7 @@ __all__ = [
     "expval",
     "probs",
     "sample",
+    "sample_from_probs",
     "var",
 ]
 
@@ -172,12 +173,46 @@ def sample(
     """
     n_shots = _check_shots(shots)
     measured = _measured_wires(wires, n_wires_of(state))
-    p = probs(state, measured).astype(np.float64)
+    return sample_from_probs(probs(state, measured), n_shots, len(measured), seed)
+
+
+def sample_from_probs(
+    probabilities: Probabilities, shots: int, n_measured: int, seed: Seed = None
+) -> Samples:
+    """Draw ``shots`` outcomes of ``n_measured`` wires from their probabilities.
+
+    This is the draw behind :func:`sample`. Backends that hold the state elsewhere (JAX, a GPU)
+    compute the probabilities there and draw here, so one seed gives the same bits on every
+    backend for the same probabilities.
+
+    Parameters
+    ----------
+    probabilities
+        The ``2**n_measured`` probabilities, first measured wire most significant. They're
+        accumulated in float64 and renormalized, and the input isn't modified.
+    shots
+        Number of samples.
+    n_measured
+        Number of measured wires.
+    seed
+        As for :func:`sample`.
+
+    Returns
+    -------
+    numpy.ndarray
+        ``int64`` array of 0/1 bits with shape ``(shots, n_measured)``.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> sample_from_probs(np.array([0.0, 0.0, 1.0, 0.0]), shots=2, n_measured=2, seed=0).tolist()
+    [[1, 0], [1, 0]]
+    """
+    p = probabilities.astype(np.float64)  # a copy
     p /= p.sum()
     rng = np.random.default_rng(seed)
-    outcomes = rng.choice(p.size, size=n_shots, p=p)
-    k = len(measured)
-    bits: Samples = (outcomes[:, None] >> np.arange(k - 1, -1, -1)) & 1
+    outcomes = rng.choice(p.size, size=shots, p=p)
+    bits: Samples = (outcomes[:, None] >> np.arange(n_measured - 1, -1, -1)) & 1
     return bits.astype(np.int64)
 
 

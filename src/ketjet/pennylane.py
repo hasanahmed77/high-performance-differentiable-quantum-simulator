@@ -42,7 +42,7 @@ from pennylane.transforms import broadcast_expand, defer_measurements, split_non
 from pennylane.transforms.core import CompilePipeline
 from pennylane.wires import Wires
 
-from ketjet.backends import Backend, NumPyBackend
+from ketjet.backends import Backend, NumPyBackend, get_backend
 from ketjet.gates import GATES
 from ketjet.kernels import apply_matrix
 from ketjet.measurements import sample
@@ -311,7 +311,9 @@ class KetjetQubit(Device):  # type: ignore[misc]  # PennyLane ships no type hint
     c_dtype
         Precision: ``"complex128"`` (default) or ``"complex64"``.
     backend
-        The ketjet backend (default: :class:`~ketjet.backends.NumPyBackend`).
+        The ketjet backend: ``"numpy"`` (default), ``"jax"``, or a
+        :class:`~ketjet.backends.Backend` instance. The JAX backend needs ``ketjet[jax]``, and
+        JAX's 64-bit mode for complex128 (:mod:`ketjet.backends.jax_backend`).
 
     Examples
     --------
@@ -334,11 +336,13 @@ class KetjetQubit(Device):  # type: ignore[misc]  # PennyLane ships no type hint
         shots: Any = None,
         seed: int | np.random.Generator | None = None,
         c_dtype: DTypeLike = "complex128",
-        backend: Backend[Any] | None = None,
+        backend: Backend[Any] | str | None = None,
     ) -> None:
         super().__init__(wires=wires, shots=shots)
         self._dtype = as_complex_dtype(c_dtype)
         self._rng = np.random.default_rng(seed)
+        if isinstance(backend, str):
+            backend = get_backend(backend)
         self._backend: Backend[Any] = backend if backend is not None else NumPyBackend()
 
     @property
