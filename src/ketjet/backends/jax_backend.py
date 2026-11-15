@@ -471,6 +471,23 @@ def _program(structure: Structure, dtype: np.dtype[Any]) -> Callable[[jax.Array]
     return jax.jit(run)
 
 
+def _real_dtype(dtype: ComplexDType) -> type[np.floating[Any]]:
+    return np.float64 if dtype == np.complex128 else np.float32
+
+
+def _slot_array(params: Sequence[Any], dtype: ComplexDType) -> jax.Array:
+    """Stack parameters (Python floats, NumPy or JAX scalars, tracers) into one slot array."""
+    real = _real_dtype(dtype)
+    if not params:
+        return jnp.zeros(0, dtype=real)
+    return jnp.stack([jnp.asarray(p, dtype=real) for p in params])
+
+
+def _global_phase(phis: Sequence[Any], dtype: ComplexDType) -> jax.Array:
+    """Return ``exp(-i Σφ)``, PennyLane's ``GlobalPhase`` convention, traceable in ``φ``."""
+    return jnp.exp(-1j * jnp.sum(_slot_array(phis, dtype))).astype(dtype)
+
+
 def clear_compile_cache() -> None:
     """Drop every cached compiled program; the next call of each one compiles again."""
     _program.cache_clear()
