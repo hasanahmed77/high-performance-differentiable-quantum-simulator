@@ -30,7 +30,7 @@ Windows 11 ── NVIDIA driver (the only driver; WSL2 shares it)
 | OS | Windows 11, 64-bit | Windows 10 21H2+ also supports GPU in WSL2. |
 | NVIDIA driver | Recent Game Ready or Studio driver whose `nvidia-smi` reports **CUDA Version 12.9 or later** | The image bundles the CUDA 12.9 runtime. |
 | WSL | WSL 2, current version from `wsl --update` | |
-| Disk | ~25 GB free | Ubuntu, Docker and the ~5 GB image. |
+| Disk | ~30 GB free | Ubuntu, Docker, and the image: 9.9 GB, measured in CI. |
 
 ## 1. Windows: driver and WSL2
 

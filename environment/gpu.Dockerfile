@@ -32,7 +32,7 @@ ENV UV_FROZEN=1 \
 RUN useradd --create-home --uid 1001 ketjet
 WORKDIR /home/ketjet/ketjet
 
-# Dependencies first, in their own layer, so a code change doesn't reinstall the 3 GB of CUDA.
+# Dependencies first, in their own layer, so a code change doesn't reinstall CUDA (most of the image's ~10 GB).
 COPY .python-version pyproject.toml uv.lock README.md LICENSE ./
 RUN uv sync --no-install-project --no-default-groups --group test --group gpu --extra pennylane
 
