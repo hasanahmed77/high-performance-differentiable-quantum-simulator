@@ -124,9 +124,25 @@ when asked for complex128. ketjet raises an error instead, and never changes JAX
 **Which JAX versions.** ketjet's JAX backend supports JAX 0.10 and later. PennyLane 0.45's own JAX interface works
 only with JAX below 0.11, so install `"jax<0.11"` if you use JAX through PennyLane.
 
-**What's not there yet.** The JAX backend runs gate by gate for now, so it isn't faster than NumPy. Compiling a
-whole circuit with `jax.jit`, `jax.grad` through it, batching and GPU execution are the next steps on the
-[roadmap](https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator#roadmap). Its
+**Compiling a circuit.** `compile_circuit` turns a circuit into a `jax.jit`-compiled function of one flat array of
+parameter values. JAX compiles it once per circuit *structure* (its wires, gates and controls), so a loop that runs
+one circuit shape with new values, as every optimizer does, compiles only on the first call:
+
+```python
+from ketjet.backends.jax_backend import compile_circuit, parameter_values
+
+run = compile_circuit(circuit)               # nothing is compiled yet
+state = run(parameter_values(circuit))       # the first call compiles
+state = run(new_values)                      # later calls reuse the program
+```
+
+Slot `k` of the array is the circuit's `k`-th gate parameter, in operation order, and a symbol that appears in two
+gates fills two slots. A bound circuit and its symbolic template share one compilation, and the most recent 128
+structures stay compiled. Compiling a circuit of several hundred gates takes seconds, so a circuit that runs only
+once is faster on NumPy.
+
+**What's not there yet.** `jax.grad` through a compiled circuit, batching and GPU execution are the next steps on
+the [roadmap](https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator#roadmap). Its
 `adjoint_jacobian` returns the same values as NumPy's but uses reverse-mode autodiff, so its memory grows with
 circuit depth.
 

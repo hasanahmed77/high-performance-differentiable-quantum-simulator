@@ -22,8 +22,11 @@ changes the setting itself. Enable it once, before creating states::
 complex64 states work in either mode.
 """
 
+import functools
+from collections import Counter
 from collections.abc import Callable, Iterable, Sequence
-from typing import Any, Final, cast
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Final, cast
 
 import jax
 import jax.numpy as jnp
@@ -50,13 +53,23 @@ from ketjet.statevector import (
     validate_n_wires,
 )
 
+if TYPE_CHECKING:
+    from ketjet.circuit import Circuit
+
 __all__ = [
+    "COMPILE_CACHE_SIZE",
     "MATRIX_BUILDERS",
+    "CompiledCircuit",
     "JaxBackend",
     "apply_gate",
     "apply_observable",
+    "circuit_structure",
+    "clear_compile_cache",
+    "compile_cache_info",
+    "compile_circuit",
     "expectation",
     "gate_matrix",
+    "parameter_values",
     "probabilities",
     "variance",
 ]
@@ -367,6 +380,186 @@ def variance(state: jax.Array, observable: Observable) -> jax.Array:
     applied = apply_observable(state, observable)
     mean = jnp.vdot(state, applied).real
     return jnp.maximum(jnp.vdot(applied, applied).real - mean * mean, 0.0)
+
+
+# --------------------------------------------------------------------------- compilation
+# One jax.jit program per circuit structure; the parameter values are its only argument
+# (ADR-0006 D2, D6).
+
+GateStructure = tuple[str, tuple[int, ...], tuple[int, ...], tuple[bool, ...]]
+"""One operation without its parameter values: gate name, targets, controls, control values."""
+
+Structure = tuple[int, tuple[GateStructure, ...]]
+"""A circuit without its parameter values: the number of wires and each operation's structure."""
+
+COMPILE_CACHE_SIZE: Final = 128
+"""How many compiled programs are kept; the least recently used one is dropped first."""
+
+# Counts how often each (structure, dtype) program has been traced. It only exists so the test
+# suite can prove that new parameter values don't retrace (QS-603).
+_TRACES: Final[Counter[tuple[Structure, np.dtype[Any]]]] = Counter()
+
+
+def circuit_structure(circuit: "Circuit") -> Structure:
+    """Return the part of ``circuit`` that a compiled program is specialized on.
+
+    Two circuits with the same structure share one compiled program, whatever their parameter
+    values, and whether those are numbers or symbolic :class:`~ketjet.operations.Parameter` s.
+
+    Examples
+    --------
+    >>> from ketjet.circuit import Circuit
+    >>> from ketjet.operations import Parameter
+    >>> circuit_structure(Circuit(2).rx(0.1, 0).cnot(0, 1))
+    (2, (('RX', (0,), (), ()), ('X', (1,), (0,), (True,))))
+    >>> bound, symbolic = Circuit(1).rx(0.1, 0), Circuit(1).rx(Parameter("a"), 0)
+    >>> circuit_structure(bound) == circuit_structure(symbolic)
+    True
+    """
+    return circuit.n_wires, tuple(
+        (op.gate, op.wires, op.controls, op.control_values) for op in circuit.operations
+    )
+
+
+def parameter_values(circuit: "Circuit") -> npt.NDArray[np.float64]:
+    """Return a bound circuit's parameter values, in the slot order a compiled program takes.
+
+    Slot ``k`` is the ``k``-th gate parameter in operation order. A symbol used by two gates
+    fills two slots.
+
+    Raises
+    ------
+    ValueError
+        If the circuit has unbound symbolic parameters.
+
+    Examples
+    --------
+    >>> from ketjet.circuit import Circuit
+    >>> parameter_values(Circuit(1).rx(0.5, 0).h(0).rot(0.1, 0.2, 0.3, 0)).tolist()
+    [0.5, 0.1, 0.2, 0.3]
+    """
+    return np.array(
+        [value for op in circuit.operations for value in op._numeric_params()], dtype=np.float64
+    )
+
+
+@functools.lru_cache(maxsize=COMPILE_CACHE_SIZE)
+def _program(structure: Structure, dtype: np.dtype[Any]) -> Callable[[jax.Array], jax.Array]:
+    n_wires, gates = structure
+    sizes = [GATES[gate].num_params for gate, *_ in gates]
+
+    def run(params: jax.Array) -> jax.Array:
+        # Python runs this only while JAX traces it. The loop is unrolled into one array program.
+        _TRACES[structure, dtype] += 1
+        state = jnp.zeros(1 << n_wires, dtype=dtype).at[0].set(1)
+        k = 0
+        for (gate, wires, controls, values), size in zip(gates, sizes, strict=True):
+            state = apply_gate(
+                state,
+                gate,
+                [params[k + j] for j in range(size)],
+                wires,
+                controls=controls,
+                control_values=values,
+            )
+            k += size
+        return state
+
+    return jax.jit(run)
+
+
+def clear_compile_cache() -> None:
+    """Drop every cached compiled program; the next call of each one compiles again."""
+    _program.cache_clear()
+
+
+def compile_cache_info() -> "functools._CacheInfo":
+    """Return the hits, misses, size and bound of the compiled-program cache."""
+    return _program.cache_info()
+
+
+@dataclass(frozen=True, eq=False)
+class CompiledCircuit:
+    """A circuit's structure compiled by ``jax.jit``: a pure function of its parameter values.
+
+    Build it with :func:`compile_circuit`. Call it with one flat real array of
+    :attr:`n_params` values, in slot order (see :func:`parameter_values`), and it returns the
+    final state as a flat JAX array. Calls with new values reuse the compiled program, and the
+    call can be traced: ``jax.grad``, ``jax.jit`` and ``jax.vmap`` apply to it.
+    """
+
+    n_wires: int
+    """Number of qubits of the state it returns."""
+
+    n_params: int
+    """Length of the parameter array it takes."""
+
+    dtype: ComplexDType
+    """Precision of the state it returns."""
+
+    _run: Callable[[jax.Array], jax.Array] = field(repr=False)
+
+    def __call__(self, params: npt.ArrayLike | jax.Array = ()) -> jax.Array:
+        """Run the circuit from ``|0…0⟩`` with ``params`` and return the final state.
+
+        ``params`` is converted to the real dtype matching :attr:`dtype` before the compiled
+        program sees it, so float32, float64 and Python lists all reuse one compilation.
+
+        Raises
+        ------
+        ValueError
+            If ``params`` doesn't hold exactly :attr:`n_params` values.
+        RuntimeError
+            If :attr:`dtype` is complex128 and JAX's 64-bit mode has been switched off since.
+        """
+        complex_dtype = _checked_dtype(self.dtype)
+        real_dtype = np.float64 if complex_dtype == np.complex128 else np.float32
+        values = jnp.asarray(params, dtype=real_dtype)
+        if values.shape != (self.n_params,):
+            raise ValueError(
+                f"The circuit takes {self.n_params} parameter value(s) as a flat array, "
+                f"got shape {values.shape}."
+            )
+        return self._run(values)
+
+
+def compile_circuit(circuit: "Circuit", dtype: DTypeLike = np.complex128) -> CompiledCircuit:
+    """Return ``circuit`` as a ``jax.jit``-compiled function of its parameter values.
+
+    The program is specialized on the circuit's structure (:func:`circuit_structure`) and
+    ``dtype``, and cached on both, so every circuit of one structure, bound or symbolic, shares a
+    single compilation. The cache keeps the :data:`COMPILE_CACHE_SIZE` most recently used
+    programs. JAX compiles on the first call, which takes seconds for circuits of hundreds of
+    gates; a circuit that runs only once is faster on the NumPy backend.
+
+    Parameters
+    ----------
+    circuit
+        The circuit; its parameter values, if any, are ignored.
+    dtype
+        Precision of the state: complex128 (default, needs JAX's 64-bit mode) or complex64.
+
+    Raises
+    ------
+    RuntimeError
+        If ``dtype`` is complex128 while JAX's 64-bit mode is off.
+
+    Examples
+    --------
+    >>> from ketjet.circuit import Circuit
+    >>> from ketjet.operations import Parameter
+    >>> run = compile_circuit(Circuit(2).ry(Parameter("theta"), 0).cnot(0, 1))
+    >>> run([3.141592653589793]).real.round(6).tolist()
+    [0.0, 0.0, 0.0, 1.0]
+    >>> run.n_params, str(run.dtype)
+    (1, 'complex128')
+    """
+    complex_dtype = _checked_dtype(dtype)
+    structure = circuit_structure(circuit)
+    n_params = sum(GATES[gate].num_params for gate, *_ in structure[1])
+    return CompiledCircuit(
+        circuit.n_wires, n_params, complex_dtype, _program(structure, complex_dtype)
+    )
 
 
 # --------------------------------------------------------------------------- backend
