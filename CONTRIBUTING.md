@@ -38,7 +38,10 @@ CI runs exactly these commands, so a change that passes locally should pass CI.
 | Types | `uv run mypy` (strict mode) |
 | Tests + coverage | `uv run pytest --cov` (fails below 85%) |
 | All hooks | `uv run pre-commit run --all-files` |
+| Dependency audit | `.github/scripts/audit-dependencies.sh` (pip-audit on both resolutions of `uv.lock`) |
 | Build | `uv build` |
+
+CodeQL runs in CI only (`.github/workflows/security.yml`), and fails a PR on any high- or critical-severity finding.
 
 Test markers: `slow`, `gpu`, `native`, `pennylane` and `nightly` are excluded from the default run.
 Select them explicitly, e.g. `uv run pytest -m gpu`.
