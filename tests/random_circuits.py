@@ -3,6 +3,7 @@
 import numpy as np
 
 from ketjet.gates import GATES
+from ketjet.observables import Hermitian, Observable, Pauli
 from ketjet.operations import Operation, Parameter
 
 
@@ -48,3 +49,27 @@ def symbolize(
             params.append(Parameter(names[k]))
         symbolic.append(Operation(op.gate, op.wires, tuple(params), op.controls, op.control_values))
     return symbolic, values, slot_symbol
+
+
+def random_observable(n_wires: int, rng: np.random.Generator) -> Observable:
+    """A random Hamiltonian: Pauli words, a ``Hermitian`` and a product, with real coefficients.
+
+    Every observable type appears, and the ``Hermitian`` takes its wires in a random order.
+    """
+    letters = "IXYZ"
+    terms: list[Observable] = [
+        float(rng.normal()) * Pauli({w: letters[int(rng.integers(4))] for w in range(n_wires)})
+        for _ in range(3)
+    ]
+    k = int(rng.integers(1, min(n_wires, 2) + 1))
+    wires = [int(w) for w in rng.permutation(n_wires)[:k]]
+    m = rng.normal(size=(2**k, 2**k)) + 1j * rng.normal(size=(2**k, 2**k))
+    hermitian = Hermitian(m + m.conj().T, wires)
+    terms.append(float(rng.normal()) * hermitian)
+    others = [w for w in range(n_wires) if w not in wires]
+    if others:
+        terms.append(hermitian @ Pauli({others[0]: "Y"}))
+    total = terms[0]
+    for term in terms[1:]:
+        total = total + term
+    return total

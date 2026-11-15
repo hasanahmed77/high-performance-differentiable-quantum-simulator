@@ -58,7 +58,7 @@ def _jacobians(qfunc: Any, wires: int, params: Any, **ours: Any) -> tuple[Any, A
 
 @pytest.mark.parametrize("dtype", DTYPES)
 @pytest.mark.parametrize("seed", range(10))
-def test_adjoint_matches_default_qubit_backprop(seed: int, dtype: Any) -> None:
+def test_adjoint_matches_default_qubit_backprop(backend_name: str, seed: int, dtype: Any) -> None:
     """Random circuits over every ketjet gate, with shared parameters, several observables."""
     rng = np.random.default_rng(3000 + seed)
     n = int(rng.integers(2, 5))
@@ -79,7 +79,7 @@ def test_adjoint_matches_default_qubit_backprop(seed: int, dtype: Any) -> None:
             slot += len(op.params)
         return [qml.expval(o) for o in observables]
 
-    ours, theirs = _jacobians(qfunc, n, theta, c_dtype=dtype)
+    ours, theirs = _jacobians(qfunc, n, theta, c_dtype=dtype, backend=backend_name)
     assert_close(ours, theirs, dtype)
 
 

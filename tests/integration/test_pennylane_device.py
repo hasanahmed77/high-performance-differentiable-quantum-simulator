@@ -15,7 +15,7 @@ qml = pytest.importorskip("pennylane")
 pytestmark = pytest.mark.pennylane
 
 from ketjet import operations as ops  # noqa: E402
-from ketjet.backends import NumPyBackend  # noqa: E402
+from ketjet.backends import NumPyBackend, get_backend  # noqa: E402
 from ketjet.observables import Hermitian, Pauli, Prod, Sum  # noqa: E402
 from ketjet.operations import Operation  # noqa: E402
 from ketjet.pennylane import KetjetQubit, to_ketjet, to_ketjet_observable  # noqa: E402
@@ -60,6 +60,16 @@ def test_import_ketjet_does_not_import_pennylane() -> None:
     assert out.stdout.strip() == "False"
 
 
+def test_backend_is_chosen_by_name_or_instance(backend_name: str) -> None:
+    by_name = KetjetQubit(wires=1, backend=backend_name)
+    assert by_name._backend.name == backend_name
+    instance = get_backend(backend_name)
+    assert KetjetQubit(wires=1, backend=instance)._backend is instance
+    assert KetjetQubit(wires=1)._backend.name == "numpy"
+    with pytest.raises(ValueError, match="Unknown backend 'tensorflow'"):
+        qml.device("ketjet.qubit", wires=1, backend="tensorflow")
+
+
 def test_rejects_unsupported_precision() -> None:
     with pytest.raises(ValueError, match="Unsupported dtype"):
         KetjetQubit(wires=1, c_dtype="float64")
@@ -70,7 +80,7 @@ def test_rejects_unsupported_precision() -> None:
 
 @pytest.mark.parametrize("dtype", DTYPES)
 @pytest.mark.parametrize("seed", range(15))
-def test_random_qnodes_match_default_qubit(seed: int, dtype: Any) -> None:
+def test_random_qnodes_match_default_qubit(backend_name: str, seed: int, dtype: Any) -> None:
     rng = np.random.default_rng(2000 + seed)
     n = int(rng.integers(2, 6))
     labels = LABELS[:n]
@@ -90,7 +100,7 @@ def test_random_qnodes_match_default_qubit(seed: int, dtype: Any) -> None:
             *(qml.var(o) for o in observables),
         )
 
-    ours, theirs = _both(qfunc, labels, c_dtype=dtype)
+    ours, theirs = _both(qfunc, labels, c_dtype=dtype, backend=backend_name)
     assert len(ours) == len(theirs)
     for a, b in zip(ours, theirs, strict=True):
         assert_close(a, b, dtype)
@@ -211,9 +221,11 @@ def _prepare() -> None:
     qml.RX(0.4, 1)
 
 
-def _shot_qnode(seed: Any, shots: Any) -> Any:
+def _shot_qnode(seed: Any, shots: Any, **device_kwargs: Any) -> Any:
+    device = qml.device("ketjet.qubit", wires=2, seed=seed, **device_kwargs)
+
     @qml.set_shots(shots)  # type: ignore[untyped-decorator]
-    @qml.qnode(qml.device("ketjet.qubit", wires=2, seed=seed))  # type: ignore[untyped-decorator]
+    @qml.qnode(device)  # type: ignore[untyped-decorator]
     def run() -> Any:
         _prepare()
         return (
@@ -236,7 +248,18 @@ def test_seeded_shots_are_reproducible() -> None:
     assert _shot_qnode(8, 500)()[0] != first[0]
 
 
-def test_shot_estimates_are_within_four_sigma() -> None:
+def test_a_seeded_device_draws_the_same_samples_on_every_backend(backend_name: str) -> None:
+    """Samples are drawn on the host from a seed, whichever backend holds the state."""
+    reference = _shot_qnode(7, 500)()
+    ours = _shot_qnode(7, 500, backend=backend_name)()
+    assert ours[0] == reference[0]
+    assert ours[1] == reference[1]
+    np.testing.assert_array_equal(ours[2], reference[2])
+    assert ours[3] == reference[3]
+
+
+@pytest.mark.parametrize("dtype", DTYPES)
+def test_shot_estimates_are_within_four_sigma(backend_name: str, dtype: Any) -> None:
     shots = 20_000
 
     def analytic() -> Any:
@@ -244,7 +267,7 @@ def test_shot_estimates_are_within_four_sigma() -> None:
         return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)), qml.expval(qml.PauliX(1))
 
     exact = _both(analytic, 2)[1]  # default.qubit's exact values
-    estimates = _shot_qnode(11, shots)()
+    estimates = _shot_qnode(11, shots, backend=backend_name, c_dtype=dtype)()
     for estimate, value in zip(estimates[:2], exact, strict=True):
         sigma = np.sqrt((1 - value**2) / shots)
         assert abs(estimate - value) <= 4 * sigma

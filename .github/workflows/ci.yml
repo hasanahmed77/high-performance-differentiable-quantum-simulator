@@ -92,8 +92,8 @@ jobs:
 
   conformance:
     name: PennyLane device suite (pl-device-test)
-    # PennyLane's own device tests, in exact and in shot mode (ADR-0005 D6). Every skip is
-    # explained in docs/pennylane.md.
+    # PennyLane's own device tests, in exact and in shot mode, on every backend (ADR-0005 D6,
+    # ADR-0006 D8). Every skip is explained in docs/pennylane.md.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -101,11 +101,23 @@ jobs:
         with:
           enable-cache: true
           python-version: "3.13"
-      - run: uv sync --group conformance
-      - name: Exact mode
-        run: uv run pl-device-test --device=ketjet.qubit -rfs
-      - name: Shot mode (10,000 shots)
-        run: uv run pl-device-test --device=ketjet.qubit --analytic=False --shots=10000 -rfs
+      # The conformance group pins the last JAX that PennyLane's JAX interface supports, so it
+      # can't be installed with the default (dev) groups, which use the latest JAX.
+      - run: uv sync --no-default-groups --group conformance
+      - name: NumPy backend, exact mode
+        run: uv run --no-sync pl-device-test --device=ketjet.qubit -rfs
+      - name: NumPy backend, shot mode (10,000 shots)
+        run: uv run --no-sync pl-device-test --device=ketjet.qubit --analytic=False --shots=10000 -rfs
+      - name: JAX backend, exact mode
+        run: uv run --no-sync pl-device-test --device=ketjet.qubit --device-kwargs backend=jax -rfs
+        env:
+          JAX_ENABLE_X64: "true"  # complex128 needs JAX's 64-bit mode (ADR-0006 D5)
+      - name: JAX backend, shot mode (10,000 shots)
+        run: >-
+          uv run --no-sync pl-device-test --device=ketjet.qubit --device-kwargs backend=jax
+          --analytic=False --shots=10000 -rfs
+        env:
+          JAX_ENABLE_X64: "true"
 
   build:
     name: Build and smoke-test distributions

@@ -10,6 +10,7 @@
 ```bash
 pip install ketjet                 # the simulator; needs only NumPy
 pip install "ketjet[pennylane]"    # plus the PennyLane device, see "PennyLane device"
+pip install "ketjet[jax]"          # plus the JAX backend, see "Backends"
 ```
 
 The latest development version installs from source:
@@ -93,6 +94,41 @@ Everything runs in `complex128` by default. Use `dtype="complex64"` to halve mem
 ```python
 bell.probs(dtype="complex64").dtype   # float32
 ```
+
+## Backends
+
+A backend holds the state and runs the gates. Every circuit method takes one:
+
+| Backend | Install | What it's for |
+|---|---|---|
+| `NumPyBackend()` (default) | `pip install ketjet` | The reference implementation: plain NumPy, the simplest to read, and the one every other backend is tested against. It also has adjoint differentiation with memory independent of depth. |
+| `JaxBackend()` | `pip install "ketjet[jax]"` | The same results on JAX arrays. Its functions can be traced by JAX, which is what compilation, backprop and GPU execution build on. |
+
+```python
+import jax
+from ketjet.backends import get_backend
+
+jax.config.update("jax_enable_x64", True)   # needed for complex128, see below
+
+backend = get_backend("jax")                 # or get_backend("numpy")
+bell.probs(backend=backend)                  # array([0.5, 0. , 0. , 0.5])
+bell.expval(Z(0) @ Z(1), backend=backend)    # 1.0
+```
+
+Both backends return the same NumPy types, and one seed gives the same samples on both.
+
+**JAX and precision.** JAX computes in 32 bits unless its 64-bit mode is on, and would quietly return complex64
+when asked for complex128. ketjet raises an error instead, and never changes JAX's settings for you. Either enable
+64-bit mode once at the start of your program, as above, or pass `dtype="complex64"`.
+
+**Which JAX versions.** ketjet's JAX backend supports JAX 0.10 and later. PennyLane 0.45's own JAX interface works
+only with JAX below 0.11, so install `"jax<0.11"` if you use JAX through PennyLane.
+
+**What's not there yet.** The JAX backend runs gate by gate for now, so it isn't faster than NumPy. Compiling a
+whole circuit with `jax.jit`, `jax.grad` through it, batching and GPU execution are the next steps on the
+[roadmap](https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator#roadmap). Its
+`adjoint_jacobian` returns the same values as NumPy's but uses reverse-mode autodiff, so its memory grows with
+circuit depth.
 
 ## Next steps
 
