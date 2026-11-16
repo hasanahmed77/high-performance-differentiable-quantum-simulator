@@ -83,6 +83,14 @@ _MatrixBuilder = Callable[[Params], jax.Array]
 
 # --------------------------------------------------------------------------- precision
 
+_DOT_PRECISION: Final = jax.lax.Precision.HIGHEST
+"""Precision of every contraction (``tensordot``, ``vdot``, ``@``) in this module.
+
+XLA's default on NVIDIA GPUs from Ampere on computes float32 products in TF32, with a 10-bit
+mantissa: complex64 states then differ from the oracle by up to ~1e-2. HIGHEST keeps float32
+arithmetic and changes nothing on the CPU or in complex128.
+"""
+
 
 def _checked_dtype(dtype: DTypeLike) -> ComplexDType:
     """Normalize ``dtype`` and refuse complex128 while JAX's 64-bit mode is off (ADR-0006 D5)."""
@@ -128,7 +136,9 @@ def _phase(params: Params) -> jax.Array:
 def _rot(params: Params) -> jax.Array:
     # Rot(phi, theta, omega) = RZ(omega) RY(theta) RZ(phi)
     phi, theta, omega = params
-    return _rz((omega,)) @ _ry((theta,)) @ _rz((phi,))
+    return jnp.linalg.multi_dot(
+        [_rz((omega,)), _ry((theta,)), _rz((phi,))], precision=_DOT_PRECISION
+    )
 
 
 def _u3(params: Params) -> jax.Array:
@@ -188,7 +198,12 @@ def gate_matrix(gate: str, params: Params = (), dtype: DTypeLike = np.complex128
 def _contract(psi: jax.Array, matrix: jax.Array, axes: tuple[int, ...]) -> jax.Array:
     """Contract a ``2**k`` square ``matrix`` with ``axes`` of ``psi`` (first axis = MSB)."""
     k = len(axes)
-    out = jnp.tensordot(matrix.reshape((2,) * (2 * k)), psi, axes=(tuple(range(k, 2 * k)), axes))
+    out = jnp.tensordot(
+        matrix.reshape((2,) * (2 * k)),
+        psi,
+        axes=(tuple(range(k, 2 * k)), axes),
+        precision=_DOT_PRECISION,
+    )
     return jnp.moveaxis(out, tuple(range(k)), axes)
 
 
@@ -365,7 +380,7 @@ def expectation(state: jax.Array, observable: Observable) -> jax.Array:
     >>> float(expectation(jnp.array([0, 1], dtype="complex64"), Z(0)))
     -1.0
     """
-    return jnp.vdot(state, apply_observable(state, observable)).real
+    return jnp.vdot(state, apply_observable(state, observable), precision=_DOT_PRECISION).real
 
 
 def variance(state: jax.Array, observable: Observable) -> jax.Array:
@@ -379,8 +394,9 @@ def variance(state: jax.Array, observable: Observable) -> jax.Array:
     1.0
     """
     applied = apply_observable(state, observable)
-    mean = jnp.vdot(state, applied).real
-    return jnp.maximum(jnp.vdot(applied, applied).real - mean * mean, 0.0)
+    mean = jnp.vdot(state, applied, precision=_DOT_PRECISION).real
+    norm2 = jnp.vdot(applied, applied, precision=_DOT_PRECISION).real
+    return jnp.maximum(norm2 - mean * mean, 0.0)
 
 
 # --------------------------------------------------------------------------- compilation
