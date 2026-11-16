@@ -185,14 +185,41 @@ docker image inspect ketjet-gpu --format '{{.Id}}'
 
 | Item | Value |
 |---|---|
-| Windows build | *to be recorded* |
-| WSL version, kernel | *to be recorded* |
-| GPU, NVIDIA driver | *to be recorded* |
-| Docker Engine | *to be recorded* |
+| Recorded | 2026-11-16, on the RTX 4060 workstation |
+| Windows build | Windows 11, 10.0.26200.9711 |
+| WSL version, kernel | WSL 3.0.5.0; kernel 6.18.58.1-microsoft-standard-WSL2; Ubuntu 24.04.5 LTS |
+| GPU, NVIDIA driver | NVIDIA GeForce RTX 4060 (8 GB, compute capability 8.9), driver 610.88 (CUDA 13.3) |
+| Docker Engine | 29.10.0, build fdd4b8e |
 | NVIDIA Container Toolkit | 1.20.1 |
-| Image ID (`ketjet-gpu`) | *to be recorded* |
-| `check_gpu.py` | *paste the full output* |
-| JAX backend tests on the GPU | *passed / failed: which* |
+| Image ID (`ketjet-gpu`) | `sha256:be6aa75a52651eac15332e9638cd4fe8e8fe30ef865f7d75f05ef9f8561f6b84`, 9.86 GB, built from `5f4cbb6` |
+| `check_gpu.py` | All checks passed (output below) |
+| JAX backend tests on the GPU | 135 of 153 passed. 18 failed, all from TF32: 17 complex64 tests off by up to 8e-3, and the test without 64-bit mode, which runs in complex64 (details below) |
+
+The `check_gpu.py` output, from `docker run --rm --gpus all ketjet-gpu`:
+
+```text
+== versions
+   Python 3.13.18, Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.39
+   ketjet 0.1.0, jax 0.12.0.1, numpy 2.5.4
+   jax-cuda12-plugin 0.12.0.1
+== nvidia-smi
+   NVIDIA GeForce RTX 4060, 610.88, 8188 MiB, 8.9
+   driver supports CUDA ?; bundled CUDA runtime 12.9.79
+== jax.devices()
+   gpu:0 NVIDIA GeForce RTX 4060
+== ketjet on gpu: 16 qubits, 8 layers
+   complex128: first call 5.43 s, then 64.15 ms; max |state - NumPy| = 1.9e-17 ok
+   complex64: first call 4.51 s, then 10.79 ms; max |state - NumPy| = 2.6e-08 ok
+   jax.jit(jax.grad): 136 parameters, |grad| = 0.0404
+== result
+   all checks passed
+```
+
+**What this run found:**
+
+- **`driver supports CUDA ?`:** driver 610.88 labels the header line `CUDA UMD Version: 13.3`, which the check didn't read, so it skipped the driver check without failing. #144 fixes that; with it, the line reads `driver supports CUDA 13.3; bundled CUDA runtime 12.9.79`.
+- **The 18 GPU test failures:** on this GPU, XLA's default precision computes float32 products in TF32, so complex64 results drifted from the NumPy oracle. The check's complex64 error also varied between runs, from 2.2e-8 to 7.3e-5 against its 1e-4 limit. With `JAX_DEFAULT_MATMUL_PRECISION=highest` all 153 tests pass. #145 sets full precision in the backend itself; with it, all 153 pass with no override, and the check's complex64 error stays at 2.3e-8 to 2.4e-8.
+- **Installing WSL:** `wsl --install` failed with `403 Forbidden` on this PC, even with `--web-download`. Installing from the two files worked (see Troubleshooting).
 
 ## Day to day
 
@@ -217,3 +244,6 @@ docker image inspect ketjet-gpu --format '{{.Id}}'
 | `jax.devices()` shows only `cpu` | The container was started without `--gpus all`, or JAX logged why CUDA failed to initialize at the top of the output. |
 | Docker can't start: `System has not been booted with systemd` | Enable systemd (step 2). |
 | `docker build` is very slow | The clone is under `/mnt/c`: clone into `~` instead. |
+| `wsl --install` fails with `403 Forbidden`, even with `--web-download` | The Store download is refused. Install from files instead: run the `wsl.<version>.x64.msi` from [WSL's releases](https://github.com/microsoft/WSL/releases), restart, download `ubuntu-24.04.5-wsl-amd64.wsl` from [releases.ubuntu.com/24.04.5](https://releases.ubuntu.com/24.04.5/) (check it against `SHA256SUMS`), then `wsl --install --from-file <the .wsl file>`. |
+| Ubuntu should live on another drive | `wsl --shutdown`, then `wsl --manage Ubuntu-24.04 --move D:\WSL\Ubuntu-24.04`. Cheapest before the image is built: the disk is ~1.5 GB then. |
+| `CUDA_ERROR_OUT_OF_MEMORY` lines at the start of a run, which then passes | JAX tries to reserve 75% of the GPU, and Windows already uses part of it, so JAX retries smaller. It's harmless; `-e XLA_PYTHON_CLIENT_PREALLOCATE=false` silences it. |
