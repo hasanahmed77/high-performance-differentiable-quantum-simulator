@@ -28,7 +28,7 @@ Windows 11 ── NVIDIA driver (the only driver; WSL2 shares it)
 |---|---|---|
 | GPU | NVIDIA RTX 4060 (8 GB, compute capability 8.9) | Any CUDA GPU of compute capability ≥ 5.2 works; the check expects this name by default. |
 | OS | Windows 11, 64-bit | Windows 10 21H2+ also supports GPU in WSL2. |
-| NVIDIA driver | Recent Game Ready or Studio driver whose `nvidia-smi` reports **CUDA Version 12.9 or later** | The image bundles the CUDA 12.9 runtime. |
+| NVIDIA driver | Recent Game Ready or Studio driver whose `nvidia-smi` reports **CUDA 12.9 or later** (`CUDA Version` on older drivers, `CUDA UMD Version` on newer ones) | The image bundles the CUDA 12.9 runtime. |
 | WSL | WSL 2, current version from `wsl --update` | |
 | Disk | ~30 GB free | Ubuntu, Docker, and the image: 9.9 GB, measured in CI. |
 
@@ -44,7 +44,8 @@ In **PowerShell** (as your normal user):
     nvidia-smi
     ```
 
-    The header must show the RTX 4060 and `CUDA Version: 12.9` or later.
+    The header must show the RTX 4060 and CUDA 12.9 or later: `CUDA Version: 12.9` on older drivers, or
+    `CUDA UMD Version: 13.3` (next to `KMD Version`) on newer ones such as 610.88.
 
 3. Install WSL2 with Ubuntu 24.04 (an administrator prompt is needed for this step only), then restart if asked:
 
