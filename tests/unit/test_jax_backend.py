@@ -18,14 +18,17 @@ from ketjet.backends.jax_backend import (
     _scale,
     apply_gate,
     apply_observable,
+    compile_circuit,
     expectation,
     gate_matrix,
+    parameter_map,
     probabilities,
     variance,
 )
+from ketjet.circuit import Circuit
 from ketjet.gates import GATES
 from ketjet.observables import Hermitian, Observable, Pauli, X, Y, Z
-from ketjet.operations import CNOT, RX, RY
+from ketjet.operations import CNOT, RX, RY, Parameter
 from ketjet.statevector import StateVector
 from tests.random_circuits import random_observable
 from tests.tolerances import assert_close
@@ -278,3 +281,41 @@ def test_probabilities_follow_the_requested_wire_order() -> None:
     assert_close(probabilities(state, [0, 2]), np.kron(p0, p2), np.complex128)
     assert_close(probabilities(state, [2, 0]), np.kron(p2, p0), np.complex128)
     assert_close(probabilities(state).sum(), 1.0, np.complex128)
+
+
+# --------------------------------------------------------------------------- matmul precision
+
+
+def _dot_precisions(jaxpr: Any) -> list[Any]:
+    """Return the ``precision`` of every ``dot_general`` in ``jaxpr``, nested jaxprs included."""
+    found = []
+    for eqn in jaxpr.eqns:
+        if eqn.primitive.name == "dot_general":
+            found.append(eqn.params["precision"])
+        for value in eqn.params.values():
+            for sub in value if isinstance(value, tuple | list) else (value,):
+                inner = getattr(sub, "jaxpr", sub)
+                if hasattr(inner, "eqns"):
+                    found.extend(_dot_precisions(inner))
+    return found
+
+
+@pytest.mark.parametrize("dtype", DTYPES)
+def test_every_contraction_and_its_gradient_asks_for_full_float32_precision(dtype: Any) -> None:
+    # XLA's default precision computes float32 products in TF32 on NVIDIA GPUs from Ampere on, so
+    # complex64 results drifted from the oracle by up to 8e-3 on an RTX 4060. A CPU can't show
+    # that drift, but it can show that no contraction is left at the default.
+    circuit = Circuit(3).rot(Parameter("a"), Parameter("b"), Parameter("c"), 0)
+    circuit.cnot(0, 1).crz(Parameter("d"), 1, 2).u3(Parameter("e"), 0.2, 0.3, 2)
+    observable = Hermitian(np.array([[1.0, 0.5j], [-0.5j, -1.0]]), [2]) @ X(0)
+    run, to_slots = compile_circuit(circuit, dtype), parameter_map(circuit)
+
+    def loss(x: jax.Array) -> jax.Array:
+        state = run(to_slots(x))
+        return expectation(state, observable) + variance(state, Z(1))
+
+    jaxpr = jax.make_jaxpr(jax.value_and_grad(loss))(jnp.linspace(0.1, 0.5, 5)).jaxpr
+    precisions = _dot_precisions(jaxpr)
+    assert precisions, "expected the circuit and its gradient to contain contractions"
+    highest = (jax.lax.Precision.HIGHEST, jax.lax.Precision.HIGHEST)
+    assert all(p == highest for p in precisions), precisions
