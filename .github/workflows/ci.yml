@@ -2,8 +2,9 @@ name: CI
 
 on:
   pull_request:
-    # labeled/unlabeled re-run the changelog check when `skip-changelog` is added or removed
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    # Not on labeled/unlabeled: a label event started a second run that cancelled the first, and the
+    # cancelled run's "CI success" reported a failure. The changelog job reads labels when it runs.
+    types: [opened, synchronize, reopened]
   push:
     branches: [main]
   workflow_dispatch:
@@ -40,9 +41,14 @@ jobs:
 
   changelog:
     name: Changelog fragment
-    # Docs-only or CI-only PRs opt out with the `skip-changelog` label.
-    if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-changelog')
+    # Docs-only or CI-only PRs opt out with the `skip-changelog` label. The label is read from the
+    # API when this job runs, not from the event, so a label added just after the PR opened counts,
+    # and so does one added later followed by a re-run of this job.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -51,9 +57,20 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --group lint
+      - name: Check for the skip-changelog label
+        id: labels
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          skip=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq 'any(.labels[]; .name == "skip-changelog")')
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+          if [ "$skip" = true ]; then echo "The PR has skip-changelog: no fragment needed."; fi
       - name: Require a news fragment in changes/
+        if: steps.labels.outputs.skip != 'true'
         run: uv run towncrier check --compare-with origin/${{ github.base_ref }}
       - name: Fragments render into the changelog
+        if: steps.labels.outputs.skip != 'true'
         run: uv run towncrier build --draft --version 0.0.0.dev0 > /dev/null
 
   audit:
@@ -197,5 +214,5 @@ jobs:
     steps:
       - name: Check all jobs passed
         run: |
-          # "skipped" is fine: the changelog job is skipped on pushes and on `skip-changelog` PRs.
+          # "skipped" is fine: the changelog job is skipped on pushes.
           echo '${{ toJSON(needs) }}' | jq -e 'to_entries | all(.value.result == "success" or .value.result == "skipped")'

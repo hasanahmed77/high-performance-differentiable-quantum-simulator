@@ -14,4 +14,5 @@ is no issue.
 ```
 
 CI fails a PR that has no new fragment, unless the PR carries the `skip-changelog` label (for docs-only or
-CI-only changes).
+CI-only changes). Adding or removing a label doesn't start CI. The changelog check reads the labels when it runs,
+so add the label when you open the PR, or re-run the **Changelog fragment** job after adding it.
