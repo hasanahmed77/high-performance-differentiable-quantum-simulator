@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted (approved by the PO on 2026-11-15 in #135) |
+| **Status** | Accepted (approved by the PO on 2026-11-15 in #135; D4 amended on 2026-11-16 in #145) |
 | **Date** | 2026-11-15 |
 | **Deciders** | Product Owner / Architect |
 | **Related stories** | QS-601 (this spike), QS-602, QS-603, QS-604, QS-608; later QS-605 (vmap), QS-606 (adjoint as `custom_vjp`), QS-607 (GPU), QS-507 (version range) |
@@ -120,6 +120,13 @@ array's axis has to be known when the program is compiled.
 - Diagonal gates multiply by a broadcast diagonal instead of contracting.
 - No permutation kernel yet. XLA already compiles a contraction with a constant permutation matrix well, and
   Sprint 7's benchmarks decide whether a dedicated kernel is worth having.
+- **Every contraction runs at full float32 precision** (`jax.lax.Precision.HIGHEST`): gate contractions, the
+  matrix products that build gates, and the inner products in `expval` and `var`. XLA's default precision computes
+  float32 matrix products in TF32 on NVIDIA GPUs from Ampere on. That keeps a 10-bit mantissa, and on the RTX 4060
+  complex64 states and gradients drifted from the oracle by up to 8e-3. The precision is set on each operation,
+  not with the global `jax_default_matmul_precision`, which would change the user's JAX program (as D5 rules
+  out). Nothing changes on the CPU or in complex128, and at 16 qubits on the RTX 4060 the run time didn't change.
+  (Amended in QS-607 by #145, approved by the PO on 2026-11-16; the first draft didn't set a precision.)
 
 ### D5. Precision is explicit: complex128 needs JAX's 64-bit mode, and ketjet never switches it on
 
@@ -206,6 +213,8 @@ warning. ADR-0001 says a state's precision is fixed at allocation and never chan
 - **Registry parity:** every parametrized gate has a JAX builder equal to its NumPy matrix.
 - **Precision:** complex128 with 64-bit mode off raises the documented error; a complex64 state never becomes
   complex128.
+- **Contraction precision:** a test walks the jaxpr of a compiled circuit and of its gradient and checks that
+  every contraction asks for `HIGHEST`. It runs on the CPU, so CI catches a regression without a GPU (D4).
 - **PennyLane:** a QNode on `backend="jax"` with `interface="jax"` gives the same value, `jax.grad` and
   `jax.jit(jax.grad)` as `default.qubit`; `pl-device-test` passes on the JAX backend.
 - **Import hygiene:** `import ketjet` in a fresh interpreter loads neither `jax` nor `pennylane`.
