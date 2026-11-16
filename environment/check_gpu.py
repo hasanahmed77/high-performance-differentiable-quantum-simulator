@@ -18,6 +18,7 @@ a GPU.
 import argparse
 import importlib.metadata
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -67,6 +68,16 @@ def _ansatz() -> Circuit:
     return circuit
 
 
+def driver_cuda_version(header: str) -> tuple[int, int] | None:
+    """Return the highest CUDA version the driver supports, from ``nvidia-smi``'s header.
+
+    Older drivers print ``CUDA Version: 12.4``; newer ones, such as 610.88, print
+    ``CUDA UMD Version: 13.3`` next to ``KMD Version``. Returns None if neither is present.
+    """
+    match = re.search(r"CUDA (?:UMD )?Version:\s*(\d+)\.(\d+)", header)
+    return (int(match[1]), int(match[2])) if match else None
+
+
 def check_driver(failures: list[str], allow_cpu: bool) -> None:
     """Check that nvidia-smi sees a GPU whose driver supports the bundled CUDA runtime."""
     print("== nvidia-smi")
@@ -78,19 +89,22 @@ def check_driver(failures: list[str], allow_cpu: bool) -> None:
         return
     query = "name,driver_version,memory.total,compute_cap"
     print("  ", _run(["nvidia-smi", f"--query-gpu={query}", "--format=csv,noheader"]))
-    header = _run(["nvidia-smi"]).splitlines()
-    cuda_line = next((line for line in header if "CUDA Version" in line), "")
-    driver_cuda = cuda_line.split("CUDA Version:")[-1].strip(" |") if cuda_line else "?"
+    supported = driver_cuda_version(_run(["nvidia-smi"]))
     runtime = _version("nvidia-cuda-runtime-cu12")
-    print(f"   driver supports CUDA {driver_cuda}; bundled CUDA runtime {runtime}")
+    shown = "?" if supported is None else f"{supported[0]}.{supported[1]}"
+    print(f"   driver supports CUDA {shown}; bundled CUDA runtime {runtime}")
+    if supported is None:
+        # Don't pass a check that didn't run: a new nvidia-smi header format must be noticed.
+        failures.append("Couldn't read the driver's CUDA version from nvidia-smi's header")
+        return
     try:
-        supported = tuple(int(x) for x in driver_cuda.split(".")[:2])
         needed = tuple(int(x) for x in runtime.split(".")[:2])
     except ValueError:
+        failures.append(f"Couldn't read the bundled CUDA runtime's version: {runtime!r}")
         return
     if supported < needed:
         failures.append(
-            f"The driver supports CUDA {driver_cuda}, older than the bundled runtime {runtime}: "
+            f"The driver supports CUDA {shown}, older than the bundled runtime {runtime}: "
             "update the NVIDIA driver on Windows"
         )
 
