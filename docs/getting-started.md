@@ -205,6 +205,56 @@ one circuit already fills the GPU.
 [roadmap](https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator#roadmap). PennyLane's
 parameter broadcasting runs as one batch on the JAX backend: see [Broadcasting](pennylane.md#broadcasting).
 
+## Running on a GPU
+
+The JAX backend runs on an NVIDIA GPU with no change to your code. Install JAX's CUDA build next to ketjet, on
+Linux or WSL2 with a recent NVIDIA driver:
+
+```bash
+pip install "ketjet[jax]" "jax[cuda12]"
+```
+
+JAX then places new arrays and compiled programs on the GPU by default, and ketjet adds no `device` argument of its
+own. JAX's `jax.default_device` and `jax.device_put` choose the device, as for any JAX program. This example runs
+anywhere: on a machine without a GPU, both runs use the CPU.
+
+```python
+import jax
+import numpy as np
+
+from ketjet.backends.jax_backend import compile_circuit, parameter_map
+from ketjet.circuit import Circuit
+from ketjet.operations import Parameter
+
+jax.config.update("jax_enable_x64", True)
+
+circuit = Circuit(2).ry(Parameter("theta"), 0).cnot(0, 1)
+run, to_slots = compile_circuit(circuit), parameter_map(circuit)
+x = np.array([0.5])
+
+state = run(to_slots(x))                          # on the GPU, if JAX sees one
+print(jax.default_backend())                      # gpu on a GPU, cpu elsewhere
+
+with jax.default_device(jax.devices("cpu")[0]):   # this run on the CPU
+    on_cpu = run(to_slots(x))
+print(np.abs(np.asarray(state) - np.asarray(on_cpu)).max() < 1e-10)   # True
+```
+
+Everything else works the same on the GPU: `expval_fn`, `jax.grad`, `jax.vmap`, both precisions, and
+`ketjet.qubit` with `backend="jax"`.
+
+- **The same results.** GPU results equal the CPU's within the [tolerances](https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator/blob/main/plan.md#63-numerical-tolerance-policy)
+  of the test suite: 1e-10 in complex128 and 1e-5 in complex64. ketjet asks XLA for full float32 precision, so
+  complex64 doesn't drop to the GPU's lower-precision TF32 mode.
+- **The same samples.** Sampling stays on the host: only the measured wires' probabilities leave the GPU, and a
+  seed gives the same bits on the GPU, the CPU and the NumPy backend.
+- **complex64 is faster.** On an RTX 4060, a 16-qubit circuit of 136 parameters ran in 11 ms in complex64 against
+  72 ms in complex128. Consumer GPUs have little 64-bit arithmetic.
+- **Memory.** A state of `n` qubits takes `2**n × 8` bytes in complex64 and twice that in complex128. On the GPU,
+  the adjoint method's memory doesn't grow with depth either: at 18 qubits, XLA counts about 12.5 states of
+  temporary memory from 4 to 32 layers, while backprop's grows by about 16 states per layer. JAX reserves 75% of the
+  GPU when it starts; set `XLA_PYTHON_CLIENT_PREALLOCATE=false` to share the GPU with other programs.
+
 ## Next steps
 
 - [API reference](reference.md)
