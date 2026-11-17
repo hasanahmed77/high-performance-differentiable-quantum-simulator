@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted: approved by the PO in #149 (the Sprint 06 plan) |
+| **Status** | Accepted: approved by the PO in #149 (the Sprint 06 plan). D5 amended by the PO on 2026-11-18: no self-hosted runner |
 | **Date** | 2026-11-17 |
 | **Deciders** | Product Owner / Architect |
 | **Related stories** | QS-605 (vmap), QS-606 (adjoint as `custom_vjp`), QS-405 (one adjoint pass for many observables), QS-607 (GPU), QS-506 (PennyLane broadcasting), QS-907 (GPU runner) |
@@ -121,6 +121,21 @@ What the code already does:
 
 ### D5. GPU tests: `gpu.yml` on a self-hosted runner, run on a PR's branch on demand
 
+> **Amended by the PO on 2026-11-18: GPU tests stay manual, and there is no self-hosted runner.** The PO doesn't
+> want the workstation reachable from GitHub Actions in any form, however hardened. QS-907 is dropped and
+> `gpu.yml` isn't created. Instead:
+>
+> - A PR that changes the JAX backend or `environment/` gets a GPU run by hand before merging: the GPU suite
+>   (`pytest -m gpu tests/gpu`, QS-607) and `environment/check_gpu.py`, in the pinned `ketjet-gpu` image. The
+>   results are pasted into the PR. The PR template's Definition of Done has a line for it.
+> - The sprint-level DoD for GPU sprints requires the same run on `main` before the sprint review, pasted into
+>   the sprint doc, in place of a green `gpu.yml` run.
+> - What's lost: nightly runs that would catch a JAX, CUDA or driver update breaking the GPU between PRs, and a
+>   check anyone can open on GitHub. The manual run before each GPU PR and each sprint review covers the first
+>   in part; the pasted output stands in for the second.
+>
+> The text below is the decision as first accepted, kept for the record.
+
 plan.md §4.5's security model stands: `gpu.yml` runs **only** on `workflow_dispatch`, `schedule` and `push` to
 `main`, never on `pull_request`, so code from forks never reaches the workstation. This ADR adds:
 
@@ -182,7 +197,5 @@ unchanged. The release includes the PennyLane floor fix from #141 (`pennylane>=0
   backward pass, on NumPy and JAX.
 - **Broadcasting:** broadcast QNodes on `backend="jax"` equal `default.qubit` for values, `jax.grad` and
   `jax.jit`, and run as one execution; on the NumPy backend they still expand.
-- **GPU:** `gpu.yml` runs the JAX test suite on the RTX 4060 and compares with the CPU at plan.md §6.3's
-  tolerances; a green run on `main` before the sprint review.
-- **Runner:** the job can't read `/mnt/c`, isn't root, and has no secrets. Each is checked by a step in
-  `gpu.yml`.
+- **GPU:** the GPU suite runs the JAX backend on the RTX 4060 and compares with the CPU at plan.md §6.3's
+  tolerances, run by hand on `main` before the sprint review (D5 as amended).

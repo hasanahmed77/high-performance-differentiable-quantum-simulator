@@ -17,8 +17,8 @@ Windows 11 ── NVIDIA driver (the only driver; WSL2 shares it)
 **Why this design** (plan.md §4.5):
 
 - **WSL2, not native Windows:** JAX's CUDA builds are Linux-only.
-- **Docker, not a virtualenv on the host:** one pinned image is the environment for development now and for the
-  self-hosted GPU runner later (Sprint 6), and it can be rebuilt exactly.
+- **Docker, not a virtualenv on the host:** one pinned image is the environment for development and for the GPU
+  tests, which run by hand (there is no self-hosted runner), and it can be rebuilt exactly.
 - **No CUDA toolkit anywhere:** `jax[cuda12]` brings the CUDA runtime as pip wheels matched to jaxlib. The only
   NVIDIA software installed by hand is the Windows driver and the container toolkit.
 
