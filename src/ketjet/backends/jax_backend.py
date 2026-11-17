@@ -26,7 +26,7 @@ import functools
 from collections import Counter
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Final, cast
+from typing import TYPE_CHECKING, Any, Final, Literal, cast
 
 import jax
 import jax.numpy as jnp
@@ -60,6 +60,7 @@ __all__ = [
     "COMPILE_CACHE_SIZE",
     "MATRIX_BUILDERS",
     "CompiledCircuit",
+    "DiffMethod",
     "JaxBackend",
     "apply_gate",
     "apply_observable",
@@ -68,6 +69,7 @@ __all__ = [
     "compile_cache_info",
     "compile_circuit",
     "expectation",
+    "expval_fn",
     "gate_matrix",
     "parameter_map",
     "parameter_values",
@@ -268,21 +270,39 @@ def apply_gate(  # noqa: PLR0913 - an operation's fields, unpacked so parameters
     out_of_range = [w for w in ctrl + targets if w >= n]
     if out_of_range:
         raise ValueError(f"{gate} uses wire(s) {out_of_range}, but the state has {n} qubit(s).")
-    values = tuple(control_values) or (True,) * len(ctrl)
     matrix = gate_matrix(gate, params, state.dtype)
-    kernel = _scale if GATES[gate].is_diagonal else _contract
-    operand = jnp.diagonal(matrix) if GATES[gate].is_diagonal else matrix
+    return _apply_matrix(state, matrix, GATES[gate].is_diagonal, targets, ctrl, control_values)
 
-    psi = state.reshape((2,) * n)
-    if not ctrl:
-        return kernel(psi, operand, targets).reshape(-1)
+
+def _active(
+    n: int, targets: tuple[int, ...], controls: tuple[int, ...], control_values: Sequence[bool]
+) -> tuple[tuple[int | slice, ...], tuple[int, ...]]:
+    """Return the index of the subspace where every control matches, and the targets' axes in it."""
+    values = tuple(control_values) or (True,) * len(controls)
     index: list[int | slice] = [slice(None)] * n
-    for wire, value in zip(ctrl, values, strict=True):
+    for wire, value in zip(controls, values, strict=True):
         index[wire] = int(value)
-    active = tuple(index)
-    free = [w for w in range(n) if w not in ctrl]  # the axes left after fixing the controls
-    block = kernel(psi[active], operand, tuple(free.index(w) for w in targets))
-    return psi.at[active].set(block).reshape(-1)
+    free = [w for w in range(n) if w not in controls]  # the axes left after fixing the controls
+    return tuple(index), tuple(free.index(w) for w in targets)
+
+
+def _apply_matrix(  # noqa: PLR0913, PLR0917 - an operation's structure, unpacked
+    state: jax.Array,
+    matrix: jax.Array,
+    diagonal: bool,
+    targets: tuple[int, ...],
+    controls: tuple[int, ...],
+    control_values: Sequence[bool],
+) -> jax.Array:
+    """Apply a ``2**k`` matrix to ``targets``, on the subspace where every control matches."""
+    n = _n_wires(state)
+    kernel = _scale if diagonal else _contract
+    operand = jnp.diagonal(matrix) if diagonal else matrix
+    psi = state.reshape((2,) * n)
+    if not controls:
+        return kernel(psi, operand, targets).reshape(-1)
+    active, axes = _active(n, targets, controls, control_values)
+    return psi.at[active].set(kernel(psi[active], operand, axes)).reshape(-1)
 
 
 # --------------------------------------------------------------------------- measurements
@@ -507,6 +527,7 @@ def _global_phase(phis: Sequence[Any], dtype: ComplexDType) -> jax.Array:
 def clear_compile_cache() -> None:
     """Drop every cached compiled program; the next call of each one compiles again."""
     _program.cache_clear()
+    _backward.cache_clear()
 
 
 def compile_cache_info() -> "functools._CacheInfo":
@@ -668,6 +689,203 @@ def parameter_map(circuit: "Circuit") -> Callable[[npt.ArrayLike | jax.Array], j
     return to_slots
 
 
+# --------------------------------------------------------------------------- adjoint
+# The adjoint recursion of ADR-0004 in jax.numpy, as the backward rule of a jax.custom_vjp
+# (ADR-0007 D2). The forward pass keeps only the final state; the backward pass undoes one gate
+# at a time, so its memory doesn't grow with circuit depth.
+
+DiffMethod = Literal["backprop", "adjoint"]
+"""How :func:`expval_fn` differentiates: JAX's reverse mode, or the adjoint method."""
+
+_DIFF_METHODS: Final[tuple[str, ...]] = ("backprop", "adjoint")
+
+# Counts the gates undone while JAX traces each backward pass. It only exists so the test suite
+# can prove that many observables share one backward pass (QS-405).
+_UNDONE: Final[Counter[tuple[Structure, np.dtype[Any]]]] = Counter()
+
+_barrier = cast(
+    Callable[[tuple[jax.Array, jax.Array, jax.Array]], tuple[jax.Array, jax.Array, jax.Array]],
+    jax.lax.optimization_barrier,
+)
+
+
+def _overlap(  # noqa: PLR0913, PLR0917 - an operation's structure, unpacked
+    lam: jax.Array,
+    psi: jax.Array,
+    derivative: jax.Array,
+    diagonal: bool,
+    targets: tuple[int, ...],
+    controls: tuple[int, ...],
+    control_values: Sequence[bool],
+) -> jax.Array:
+    r"""Return :math:`2\,\mathrm{Re}\,\langle\lambda|\partial U|\psi\rangle` for one gate parameter.
+
+    The derivative of a controlled gate is zero outside the subspace where the controls match, so
+    only that block of both states takes part.
+    """
+    n = _n_wires(psi)
+    kernel = _scale if diagonal else _contract
+    operand = jnp.diagonal(derivative) if diagonal else derivative
+    psi_t, lam_t, axes = psi.reshape((2,) * n), lam.reshape((2,) * n), targets
+    if controls:
+        active, axes = _active(n, targets, controls, control_values)
+        psi_t, lam_t = psi_t[active], lam_t[active]
+    mu = kernel(psi_t, operand, axes)
+    return 2 * jnp.vdot(lam_t, mu, precision=_DOT_PRECISION).real
+
+
+@functools.lru_cache(maxsize=COMPILE_CACHE_SIZE)
+def _backward(
+    structure: Structure, dtype: np.dtype[Any]
+) -> Callable[[jax.Array, jax.Array, jax.Array], jax.Array]:
+    r"""Return the compiled backward pass of a circuit structure (ADR-0004 D3).
+
+    It maps the slot array, the final state :math:`|\psi\rangle` and :math:`|\lambda\rangle =
+    O|\psi\rangle` to :math:`\partial \langle O \rangle / \partial x` for every slot, holding
+    three states at a time.
+    """
+    _, gates = structure
+    sizes = [GATES[gate].num_params for gate, *_ in gates]
+    offsets = np.cumsum([0, *sizes]).tolist()
+
+    def run(params: jax.Array, psi: jax.Array, lam: jax.Array) -> jax.Array:
+        grads = jnp.zeros_like(params)
+        for k in range(len(gates) - 1, -1, -1):
+            gate, wires, controls, values = gates[k]
+            diagonal = GATES[gate].is_diagonal
+            p = params[offsets[k] : offsets[k + 1]]
+            dagger = gate_matrix(gate, list(p), dtype).conj().T
+            _UNDONE[structure, dtype] += 1
+            psi = _apply_matrix(psi, dagger, diagonal, wires, controls, values)  # now |ψ_{k-1}⟩
+            if sizes[k]:
+                derivatives = jax.jacfwd(lambda q, gate=gate: gate_matrix(gate, list(q), dtype))(p)
+                for j in range(sizes[k]):
+                    dj = derivatives[..., j]
+                    overlap = _overlap(lam, psi, dj, diagonal, wires, controls, values)
+                    grads = grads.at[offsets[k] + j].set(overlap.astype(params.dtype))
+            if k:
+                lam = _apply_matrix(lam, dagger, diagonal, wires, controls, values)
+            # Without the barrier XLA may schedule an overlap after later gates, keeping its
+            # |ψ_{k-1}⟩ alive: memory would grow with depth again.
+            psi, lam, grads = _barrier((psi, lam, grads))
+        return grads
+
+    return jax.jit(run)
+
+
+def _measure(
+    state: jax.Array, observables: Sequence[Observable], real: type[np.floating[Any]]
+) -> jax.Array:
+    if not observables:
+        return jnp.zeros(0, dtype=real)
+    return jnp.stack([expectation(state, obs) for obs in observables])
+
+
+def _adjoint_expvals(
+    structure: Structure, dtype: ComplexDType, observables: tuple[Observable, ...]
+) -> Callable[[jax.Array], jax.Array]:
+    """Return slot array -> expectation values, differentiated by the adjoint method."""
+    forward, backward = _program(structure, dtype), _backward(structure, dtype)
+    real = _real_dtype(dtype)
+
+    @jax.custom_vjp
+    def expvals(params: jax.Array) -> jax.Array:
+        return _measure(forward(params), observables, real)
+
+    def fwd(params: jax.Array) -> tuple[jax.Array, tuple[jax.Array, jax.Array]]:
+        state = forward(params)
+        return _measure(state, observables, real), (params, state)
+
+    def bwd(residuals: tuple[jax.Array, jax.Array], v: jax.Array) -> tuple[jax.Array]:
+        # A cotangent v asks for the gradient of Σ v_m ⟨O_m⟩: one observable, so one pass
+        # (ADR-0004 D6).
+        params, state = residuals
+        lam = jnp.zeros_like(state)
+        for m, obs in enumerate(observables):
+            lam = lam + v[m].astype(state.dtype) * apply_observable(state, obs)
+        return (backward(params, state, lam),)
+
+    expvals.defvjp(fwd, bwd)
+    return expvals
+
+
+def expval_fn(
+    circuit: "Circuit",
+    observables: Sequence[Observable],
+    *,
+    dtype: DTypeLike = np.complex128,
+    diff_method: DiffMethod = "backprop",
+) -> Callable[[npt.ArrayLike | jax.Array], jax.Array]:
+    r"""Return ``f(values)``: the expectation values of ``observables``, differentiable by JAX.
+
+    ``values`` holds one value per symbol, in :attr:`Circuit.parameters
+    <ketjet.circuit.Circuit.parameters>` order, as for :func:`parameter_map`, and ``f`` returns
+    an array of shape ``(len(observables),)``. ``jax.grad``, ``jax.jacrev``, ``jax.jit`` and
+    ``jax.vmap`` apply to it, and the state runs on the program :func:`compile_circuit` builds.
+
+    Parameters
+    ----------
+    circuit
+        The circuit; its numeric parameters stay fixed, and its symbols are ``f``'s inputs.
+    observables
+        The observables :math:`O_m`.
+    dtype
+        Precision of the state: complex128 (default, needs JAX's 64-bit mode) or complex64.
+    diff_method
+        How reverse mode differentiates ``f`` (ADR-0007 D2):
+
+        ``"backprop"`` (default)
+            JAX's own reverse mode. It stores every intermediate state, so its memory grows with
+            circuit depth, and it supports every JAX transform, forward mode included.
+        ``"adjoint"``
+            The adjoint method (ADR-0004): the backward pass undoes one gate at a time and holds
+            three states, however deep the circuit and however many observables. It is a
+            ``jax.custom_vjp``, so ``f`` itself has no forward mode: ``jax.jvp`` and
+            ``jax.jacfwd`` raise ``TypeError``. ``jax.hessian`` works, as forward mode over the
+            backward pass.
+
+    Raises
+    ------
+    ValueError
+        If ``diff_method`` is unknown, or an observable acts on a wire outside the circuit.
+    RuntimeError
+        If ``dtype`` is complex128 while JAX's 64-bit mode is off.
+
+    Examples
+    --------
+    >>> import jax
+    >>> from ketjet.circuit import Circuit
+    >>> from ketjet.observables import X, Z
+    >>> from ketjet.operations import Parameter
+    >>> circuit = Circuit(1).ry(Parameter("theta"), 0)  # <Z> = cos θ, <X> = sin θ
+    >>> f = expval_fn(circuit, [Z(0), X(0)], diff_method="adjoint")
+    >>> jax.jacrev(f)(jax.numpy.array([0.5])).round(6).tolist()  # -sin θ, cos θ
+    [[-0.479426], [0.877583]]
+    """
+    if diff_method not in _DIFF_METHODS:
+        raise ValueError(f"Unknown diff_method {diff_method!r}; use 'backprop' or 'adjoint'.")
+    complex_dtype = _checked_dtype(dtype)
+    real = _real_dtype(complex_dtype)
+    obs = tuple(observables)
+    for o in obs:
+        _check_in_state(o, circuit.n_wires)
+    structure = circuit_structure(circuit)
+    to_slots = parameter_map(circuit)
+    if diff_method == "adjoint":
+        expvals = _adjoint_expvals(structure, complex_dtype, obs)
+    else:
+        run = _program(structure, complex_dtype)
+
+        def expvals(params: jax.Array) -> jax.Array:
+            return _measure(run(params), obs, real)
+
+    def f(values: npt.ArrayLike | jax.Array) -> jax.Array:
+        _checked_dtype(complex_dtype)
+        return expvals(to_slots(jnp.asarray(values, dtype=real)))
+
+    return f
+
+
 # --------------------------------------------------------------------------- backend
 
 
@@ -766,18 +984,12 @@ class JaxBackend:
         *,
         dtype: DTypeLike = np.complex128,
     ) -> npt.NDArray[np.float64]:
-        """Return ``∂⟨O_m⟩/∂x_s`` for the ``trainable`` slots, by reverse-mode autodiff.
+        """Return ``∂⟨O_m⟩/∂x_s`` for the ``trainable`` slots, by the adjoint method.
 
-        Same arguments, shape and values as :func:`ketjet.adjoint.adjoint_jacobian`. It runs
-        the program :func:`compile_circuit` would build, so circuits of one structure share a
-        compilation here too.
-
-        Notes
-        -----
-        This uses ``jax.jacrev``, which stores the forward pass, so its memory grows with
-        circuit depth: **the depth-independent memory of ADR-0004 D4 isn't met on this backend
-        yet**. QS-606 replaces it with the adjoint recursion (ADR-0006 D7). Use the NumPy
-        backend where that bound matters.
+        Same arguments, shape and values as :func:`ketjet.adjoint.adjoint_jacobian`, and the same
+        memory bound (ADR-0004 D4): it is the backward rule of :func:`expval_fn` with
+        ``diff_method="adjoint"``, batched over the observables, so it holds ``2 + M`` states
+        however deep the circuit. Circuits of one structure share one compilation.
 
         Raises
         ------
@@ -795,19 +1007,14 @@ class JaxBackend:
         if not trainable or not observables:
             return jac
 
-        # Differentiate the compiled program with respect to its whole slot array, then pick the
-        # trainable columns. Reverse mode costs one backward pass per observable however many
-        # slots there are, and a slot named twice simply repeats its column.
+        # Differentiate with respect to the whole slot array, then pick the trainable columns:
+        # one backward pass, batched over the observables. A slot named twice repeats its column.
         structure = _structure(n_wires, ops)
-        run = _program(structure, complex_dtype)
-        real_dtype = np.float64 if complex_dtype == np.complex128 else np.float32
-        x = jnp.asarray([v for op in ops for v in op._numeric_params()], dtype=real_dtype)
+        x = jnp.asarray(
+            [v for op in ops for v in op._numeric_params()], dtype=_real_dtype(complex_dtype)
+        )
         offsets = np.cumsum([0] + [op.spec.num_params for op in ops])
-
-        def measure(params: jax.Array) -> jax.Array:
-            state = run(params)
-            return jnp.stack([expectation(state, obs) for obs in observables])
-
-        full = np.asarray(jax.jacrev(measure)(x), dtype=np.float64)
+        expvals = _adjoint_expvals(structure, complex_dtype, tuple(observables))
+        full = np.asarray(jax.jacrev(expvals)(x), dtype=np.float64)
         jac[:] = full[:, [offsets[i] + j for i, j in trainable]]
         return jac
