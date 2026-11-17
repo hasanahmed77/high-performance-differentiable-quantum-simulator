@@ -201,8 +201,9 @@ small to keep the device busy. On an RTX 4060 in complex64, one batched call aga
 365× faster at 8 qubits (batch 1024), 19× at 12 (256) and 2.2× at 16 (64), and no faster at 20 qubits (16), where
 one circuit already fills the GPU.
 
-**What's not there yet.** GPU execution is tested by hand for now, and PennyLane's parameter broadcasting is next
-on the [roadmap](https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator#roadmap).
+**What's not there yet.** GPU execution is tested by hand for now; an automatic GPU test run is next on the
+[roadmap](https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator#roadmap). PennyLane's
+parameter broadcasting runs as one batch on the JAX backend: see [Broadcasting](pennylane.md#broadcasting).
 
 ## Next steps
 
