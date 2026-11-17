@@ -131,6 +131,30 @@ jax.jit(jax.grad(circuit))(jax.numpy.array([0.3, 1.2]))
   backend's `diff_method="adjoint"` gives the same gradients with memory independent of depth.
 - `"best"` still means adjoint for exact expectation values.
 
+### Broadcasting
+
+PennyLane's parameter broadcasting, a gate parameter given as an array of values, works on both backends and
+returns what `default.qubit` returns: one result per value.
+
+```python
+@qml.qnode(dev, interface="jax", diff_method="backprop")
+def circuit(theta):
+    qml.RX(theta, 0)
+    return qml.expval(qml.PauliZ(0))
+
+circuit(jax.numpy.array([0.1, 0.2, 0.3]))   # shape (3,): one expectation value per angle
+```
+
+On the JAX backend, an exact broadcast circuit runs as **one** batched execution, mapped with `jax.vmap` from the
+same compilation ([ADR-0007](adr/0007-jax-batching-adjoint-gpu.md) D3), both when it is only executed and under
+`diff_method="backprop"`. `qml.Tracker` counts one simulation for it. Everywhere else PennyLane splits it into
+one circuit per value (`broadcast_expand`), as its own devices do:
+
+- on the NumPy backend;
+- with shots;
+- with `diff_method="adjoint"` (and `"best"`) or `"parameter-shift"`. PennyLane's parameter-shift can't
+  differentiate with respect to a broadcast parameter on any device; with respect to the others it works.
+
 ## Conformance
 
 PennyLane's own device test suite, `pl-device-test`, runs on every pull request in exact mode and in shot mode
@@ -167,7 +191,7 @@ uv run --no-sync pl-device-test --device=ketjet.qubit
 uv run --no-sync pl-device-test --device=ketjet.qubit --analytic=False --shots=10000
 JAX_ENABLE_X64=true uv run --no-sync pl-device-test --device=ketjet.qubit --device-kwargs backend=jax \
   -k "not (test_gradients_autograd and backprop)"
-uv run --no-sync pytest tests/integration/test_pennylane_jax_interface.py tests/integration/test_pennylane_backprop.py
+uv run --no-sync pytest tests/integration/test_pennylane_jax_interface.py tests/integration/test_pennylane_backprop.py \n  tests/integration/test_pennylane_broadcasting.py
 ```
 
 The last line runs ketjet's own QNode tests under PennyLane's JAX interface, which the main test suite skips
@@ -179,7 +203,8 @@ replaces the development environment. Run `uv sync` afterwards to get that back.
 ## Limitations
 
 - **Backprop on the JAX backend only**, with a JAX interface and exact results (see [Backprop](#backprop)).
-- **Batched parameters** run as a loop of circuits (PennyLane's `broadcast_expand`), until native broadcasting.
+- **Broadcast circuits** run as one batched execution only on the JAX backend, exact, executed or under backprop
+  (see [Broadcasting](#broadcasting)). Otherwise they run as one circuit per value.
 - **Mid-circuit measurements** are deferred: each one becomes an extra wire.
 - **Supported PennyLane versions:** 0.44.1 to 0.45.x. CI runs the minimum and the latest. 0.44.0 isn't supported:
   it can't be imported with current versions of its own dependency `diastatic-malt`, which PennyLane fixed in 0.44.1.
