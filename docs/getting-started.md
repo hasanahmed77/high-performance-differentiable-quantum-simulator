@@ -168,7 +168,23 @@ step = jax.jit(lambda x: x - 0.5 * jax.grad(energy)(x))   # one compilation for 
 The gradients equal `ketjet.gradients`' adjoint and parameter-shift results. Backprop stores the forward pass, so
 its memory grows with circuit depth; the NumPy backend's adjoint method doesn't, which matters for deep circuits.
 
-**What's not there yet.** Batching with `jax.vmap` and GPU execution are the next steps on the
+**Batching with `jax.vmap`.** To run one circuit with many sets of values, map the function with `jax.vmap`.
+JAX turns it into one batched program, from the same compilation, and it combines with `jax.grad` and `jax.jit`:
+
+```python
+batch = jax.numpy.stack([x0, x1, x2])                      # shape (3, number of symbols)
+energies = jax.vmap(energy)(batch)                         # shape (3,)
+steps = jax.jit(jax.vmap(lambda x: x - 0.5 * jax.grad(energy)(x)))
+```
+
+A compiled circuit takes one flat array, so passing it a batch directly raises an error that points to
+`jax.vmap`. A batch holds one state per entry, `batch × 2**n` amplitudes, so it helps most when one circuit is too
+small to keep the device busy. On an RTX 4060 in complex64, one batched call against a loop of single calls was
+365× faster at 8 qubits (batch 1024), 19× at 12 (256) and 2.2× at 16 (64), and no faster at 20 qubits (16), where
+one circuit already fills the GPU.
+
+**What's not there yet.** GPU execution is tested by hand for now; adjoint gradients inside JAX and PennyLane's
+parameter broadcasting are next on the
 [roadmap](https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator#roadmap). The JAX
 backend's `adjoint_jacobian` returns the same values as NumPy's but uses reverse-mode autodiff, so its memory also
 grows with circuit depth.

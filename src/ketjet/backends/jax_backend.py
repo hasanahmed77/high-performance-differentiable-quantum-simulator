@@ -514,6 +514,13 @@ def compile_cache_info() -> "functools._CacheInfo":
     return _program.cache_info()
 
 
+def _batch_hint(shape: tuple[int, ...], length: int) -> str:
+    """Return a pointer to ``jax.vmap`` when ``shape`` looks like a batch of ``length`` values."""
+    if len(shape) > 1 and shape[-1] == length:  # a batch axis in front of the values
+        return " To run a batch of value sets, use jax.vmap: jax.vmap(f)(batch)."
+    return ""
+
+
 @dataclass(frozen=True, eq=False)
 class CompiledCircuit:
     """A circuit's structure compiled by ``jax.jit``: a pure function of its parameter values.
@@ -522,6 +529,21 @@ class CompiledCircuit:
     :attr:`n_params` values, in slot order (see :func:`parameter_values`), and it returns the
     final state as a flat JAX array. Calls with new values reuse the compiled program, and the
     call can be traced: ``jax.grad``, ``jax.jit`` and ``jax.vmap`` apply to it.
+
+    To run a batch of value sets, map it with ``jax.vmap`` (ADR-0007 D1): ``jax.vmap(run)`` takes
+    an array of shape ``(batch, n_params)`` and returns ``(batch, 2**n_wires)`` states from the
+    same compiled program. A batch holds one state per entry, so it helps most for circuits too
+    small to keep the device busy on their own.
+
+    Examples
+    --------
+    >>> import jax
+    >>> from ketjet.circuit import Circuit
+    >>> from ketjet.operations import Parameter
+    >>> run = compile_circuit(Circuit(1).ry(Parameter("theta"), 0))
+    >>> batch = jax.numpy.array([[0.0], [3.141592653589793]])
+    >>> jax.vmap(run)(batch).real.round(6).tolist()
+    [[1.0, 0.0], [0.0, 1.0]]
     """
 
     n_wires: int
@@ -544,7 +566,8 @@ class CompiledCircuit:
         Raises
         ------
         ValueError
-            If ``params`` doesn't hold exactly :attr:`n_params` values.
+            If ``params`` doesn't hold exactly :attr:`n_params` values. A batch of value sets is
+            refused with a pointer to ``jax.vmap``.
         RuntimeError
             If :attr:`dtype` is complex128 and JAX's 64-bit mode has been switched off since.
         """
@@ -554,7 +577,7 @@ class CompiledCircuit:
         if values.shape != (self.n_params,):
             raise ValueError(
                 f"The circuit takes {self.n_params} parameter value(s) as a flat array, "
-                f"got shape {values.shape}."
+                f"got shape {values.shape}.{_batch_hint(values.shape, self.n_params)}"
             )
         return self._run(values)
 
@@ -634,7 +657,7 @@ def parameter_map(circuit: "Circuit") -> Callable[[npt.ArrayLike | jax.Array], j
         if x.shape != (n_symbols,):
             raise ValueError(
                 f"The circuit has {n_symbols} symbol(s), so it takes that many values as a flat "
-                f"array, got shape {x.shape}."
+                f"array, got shape {x.shape}.{_batch_hint(x.shape, n_symbols)}"
             )
         if not slots:
             return jnp.zeros(0, dtype=x.dtype)
