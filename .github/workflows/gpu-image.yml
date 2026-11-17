@@ -3,7 +3,7 @@ name: GPU image
 # Builds the GPU workstation image (environment/gpu.Dockerfile, QS-112) whenever it or the
 # locked dependencies change, and smoke-tests it on a hosted runner. Hosted runners have no GPU,
 # so the check runs with --allow-cpu; the GPU checks run on the workstation itself
-# (docs/dev/gpu-workstation.md) and, from Sprint 6, in gpu.yml.
+# (docs/dev/gpu-workstation.md), by hand: there is no self-hosted runner (ADR-0007 D5, amended).
 on:
   pull_request:
     paths:
