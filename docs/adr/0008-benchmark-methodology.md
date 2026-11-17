@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Proposed |
+| **Status** | Accepted: approved by the PO on 2026-11-18 in #155, including D7's 10% starting threshold |
 | **Date** | 2026-11-18 |
 | **Deciders** | Product Owner / Architect |
 | **Related stories** | QS-1101 (this ADR); QS-1102 (suite), QS-1103 (comparisons), QS-1104 (plots), QS-1105 (asv), QS-1106 (roofline), QS-908 (T4 run) |
@@ -161,7 +161,7 @@ performance" power mode, no other heavy programs running (games, browsers playin
   A full suite of about 100 cases takes 15 to 30 minutes; a quick mode with 1 process and 5 samples is for
   development only and isn't published.
 - **Negative:** a 10% regression threshold lets a slowdown of 5 to 10% through until QS-1105 shows the runners
-  are quiet enough for 5%. This is a change from plan.md §6.1 and needs the PO's approval.
+  are quiet enough for 5%. This is a change from plan.md §6.1, approved by the PO in #155.
 - **Follow-ups:** QS-1102 builds the harness and the suite; QS-1103 adds the comparison lock group; QS-1105
   measures hosted-runner noise and sets the threshold.
 
