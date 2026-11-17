@@ -69,7 +69,8 @@ What the code already does:
 - **Backprop stays the default.** `custom_vjp` rules out forward mode, so `jax.jvp` and `jax.jacfwd` fail
   with `"adjoint"`. The docstring and docs say so and point to backprop for them. `jax.hessian` works: it is
   forward mode over the backward pass, which is ordinary JAX code. (Corrected in QS-606, which measured it equal to
-  backprop's Hessian; this ADR first said `jax.hessian` fails too.)
+  backprop's Hessian; this ADR first said `jax.hessian` fails too. Both D2 corrections approved by the PO
+  on 2026-11-17 in #151.)
 - The backward pass places `jax.lax.optimization_barrier` after each gate. Without it XLA may compute a gradient
   entry after later gates and keep that gate's state alive, and the temporary memory grows with depth again
   (measured in QS-606: 9 to 17 states at 12 qubits from 4 to 16 layers; with the barrier, 5.1 to 5.4).
