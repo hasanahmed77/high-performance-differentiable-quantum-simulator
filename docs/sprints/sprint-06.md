@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Planned: awaiting PO approval |
+| **Status** | In progress: plan approved by the PO in #149 |
 | **Started** | 2026-11-17 |
 | **Milestone** | `Sprint 06 – JAX backend II (batching, GPU)` |
 | **Sprint goal** | A user can batch circuits with `jax.vmap`, get adjoint gradients with depth-independent memory inside JAX programs, broadcast parameters through PennyLane, and run all of it on a GPU that CI tests. Release **v0.2.0**. |
@@ -33,7 +33,8 @@ and Sprint 7's benchmarks need it first.
 - **QS-405, 3 → 1.** The NumPy adjoint has made one backward pass for many observables since Sprint 3 (#121); no
   test asserts it. On JAX it comes with QS-606's backward rule. The story becomes the test on both backends.
 
-**Sequencing.** QS-907 goes first, so every later JAX PR gets a GPU run before merging (ADR-0007 D5). Then the
+**Sequencing.** *Changed with PO approval on 2026-11-17: QS-605 goes first, and QS-907 waits until the PO is at the
+workstation; until then GPU checks run by hand in the image and are pasted into each PR.* QS-907 was planned first, so every later JAX PR gets a GPU run before merging (ADR-0007 D5). Then the
 JAX stories in order: batching, adjoint (with QS-405), broadcasting. QS-607 is last, because it adds the GPU
 suite to `gpu.yml`. QS-1101 can go in while a JAX PR waits on CI.
 
