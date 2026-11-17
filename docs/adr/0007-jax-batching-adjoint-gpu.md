@@ -74,6 +74,12 @@ What the code already does:
 - The backward pass places `jax.lax.optimization_barrier` after each gate. Without it XLA may compute a gradient
   entry after later gates and keep that gate's state alive, and the temporary memory grows with depth again
   (measured in QS-606: 9 to 17 states at 12 qubits from 4 to 16 layers; with the barrier, 5.1 to 5.4).
+- **JAX 0.10 is not fully flat.** Its older XLA doesn't keep the barriers' schedule: the adjoint gradient grows by
+  about 0.4 states per layer (8.1 to 13.0 states at 12 qubits from 4 to 16 layers), against backprop's 12, and
+  the same at 10 and 14 qubits. JAX 0.11 and later are flat. Other orderings of the backward pass didn't help on
+  0.10. The memory test checks the flat bound on JAX ≥0.11 and, on 0.10, that the adjoint grows at most a tenth
+  as fast as backprop. The floor can't rise to 0.11, because PennyLane's JAX interface needs JAX <0.11
+  (ADR-0006 D1). Approved by the PO on 2026-11-17 in #151.
 - `JaxBackend.adjoint_jacobian` switches from `jax.jacrev` to this path. That meets ADR-0004 D4's memory bound
   on JAX and closes ADR-0006 D7's caveat.
 - **QS-405 lands here:** one test asserts one backward pass for many observables on NumPy (as built in Sprint 3),
@@ -169,7 +175,8 @@ unchanged. The release includes the PennyLane floor fix from #141 (`pennylane>=0
   structure; a 2-D input to `CompiledCircuit` raises the error that names `jax.vmap`.
 - **Adjoint in JAX:** `expval_fn(..., diff_method="adjoint")` equals backprop and `ketjet.gradients.jacobian`
   with `"adjoint"`, under `jit` and `vmap`; `jax.jacfwd` raises the documented error and `jax.hessian` equals
-  backprop's; XLA's temporary memory for the adjoint gradient is flat with depth, while backprop's grows.
+  backprop's; XLA's temporary memory for the adjoint gradient is flat with depth, while backprop's grows
+  (on JAX 0.10, it grows at most a tenth as fast as backprop's: see D2).
   (QS-606 measures 4 to 16 layers at 12 qubits: deeper circuits take minutes to compile on the CPU.)
 - **One pass (QS-405):** counting gate applications, the Jacobian of 1 and of 8 observables both make one
   backward pass, on NumPy and JAX.

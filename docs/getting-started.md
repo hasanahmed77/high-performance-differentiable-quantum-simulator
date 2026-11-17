@@ -183,7 +183,8 @@ jacobian = jax.jacrev(energies)(x)                                # shape (2, nu
 It works with `jax.grad`, `jax.jacrev`, `jax.hessian`, `jax.jit` and `jax.vmap`. It has no forward mode of its own,
 so `jax.jvp` and `jax.jacfwd` raise `TypeError`: use the default, `diff_method="backprop"`, for those. On 12 qubits, XLA's own
 accounting of a gradient's temporary memory stays at about 5 states from 4 to 16 layers with the adjoint method,
-while backprop's grows by one state per parametrized gate.
+while backprop's grows by one state per parametrized gate. On JAX 0.10 the adjoint method still grows a little,
+by about 0.4 states per layer at 12 qubits, because of that version's compiler; JAX 0.11 and later stay flat.
 
 **Batching with `jax.vmap`.** To run one circuit with many sets of values, map the function with `jax.vmap`.
 JAX turns it into one batched program, from the same compilation, and it combines with `jax.grad` and `jax.jit`:
