@@ -215,6 +215,18 @@ def _when_sampled(tape: QuantumScript, inner: Callable[..., Any]) -> Any:
     return inner(tape)
 
 
+@qml.transform  # type: ignore[untyped-decorator]
+def _expand_broadcast(tape: QuantumScript, batched: bool) -> Any:
+    """Split a broadcast tape into one tape per entry, unless the device runs it batched.
+
+    With ``batched``, an exact broadcast tape stays whole and runs as one ``jax.vmap``-ed
+    execution (ADR-0007 D3); tapes with shots are still split.
+    """
+    if batched and not tape.shots:
+        return (tape,), null_postprocessing
+    return broadcast_expand(tape)
+
+
 def _to_eigenbasis(
     host: StateVector, measurements: Sequence[Any], wire_order: Wires
 ) -> StateVector:
@@ -304,6 +316,25 @@ def _format_jacobian(jac: npt.NDArray[np.float64]) -> Any:
     return tuple(tuple(np.array(j) for j in row) for row in squeezed)
 
 
+def _columns(values: Sequence[Any], batch: int, dtype: np.dtype[Any]) -> Any:
+    """Stack scalar and length-``batch`` parameters into a ``(batch, len(values))`` JAX array."""
+    import jax.numpy as jnp  # noqa: PLC0415 - JAX is optional
+
+    from ketjet.backends import jax_backend  # noqa: PLC0415 - JAX is optional
+
+    real = jax_backend._real_dtype(dtype)
+    if not values:
+        return jnp.zeros((batch, 0), dtype=real)
+    return jnp.stack([jnp.broadcast_to(jnp.asarray(v, dtype=real), (batch,)) for v in values], 1)
+
+
+def _to_host(result: Any) -> Any:
+    """Return a result of JAX arrays, or a tuple of them, as NumPy arrays."""
+    if isinstance(result, tuple):
+        return tuple(np.asarray(r) for r in result)
+    return np.asarray(result)
+
+
 # --------------------------------------------------------------------------- the device
 
 
@@ -387,7 +418,7 @@ class KetjetQubit(Device):  # type: ignore[misc]  # PennyLane ships no type hint
             name=self.name,
         )
         program.add_transform(validate_measurements, name=self.name)
-        program.add_transform(broadcast_expand)
+        program.add_transform(_expand_broadcast, batched=self._runs_batched(execution_config))
         program.add_transform(_when_sampled, inner=split_non_commuting)
         program.add_transform(_when_sampled, inner=diagonalize_measurements)
         if execution_config is not None and execution_config.gradient_method == "adjoint":
@@ -568,6 +599,15 @@ class KetjetQubit(Device):  # type: ignore[misc]  # PennyLane ships no type hint
             out[:, b] = self._jacobian(n_wires, operations, [combined], slots)[0]
         return out if batched else out[:, 0]
 
+    def _runs_batched(self, execution_config: ExecutionConfig | None) -> bool:
+        """Broadcast tapes run as one batch on the JAX backend, executed or under backprop (D3).
+
+        Adjoint and parameter-shift differentiate one tape per batch entry, as PennyLane's own
+        devices do, so their tapes are split; so are the NumPy backend's.
+        """
+        method = None if execution_config is None else execution_config.gradient_method
+        return self._backend.name == "jax" and method in {None, "backprop"}
+
     def _backprop_supported(
         self, execution_config: ExecutionConfig, circuit: QuantumScript | None
     ) -> bool:
@@ -587,6 +627,8 @@ class KetjetQubit(Device):  # type: ignore[misc]  # PennyLane ships no type hint
                 'diff_method="backprop" on ketjet.qubit needs exact results; samples can\'t be '
                 "differentiated. Use shots=None, or parameter-shift with shots."
             )
+        import jax  # noqa: PLC0415 - JAX is optional
+
         from ketjet.backends import jax_backend  # noqa: PLC0415 - JAX is optional
 
         wire_order = self._wire_order(tape)
@@ -603,13 +645,25 @@ class KetjetQubit(Device):  # type: ignore[misc]  # PennyLane ships no type hint
             params.extend(op_params)
         n_wires = max(len(wire_order), 1)
         run = jax_backend._program((n_wires, tuple(gates)), self._dtype)
-        state = run(jax_backend._slot_array(params, self._dtype))
-        if phases:
-            state = state * jax_backend._global_phase(phases, self._dtype)
-        results = tuple(
-            self._traced_measurement(mp, state, index, n_wires) for mp in tape.measurements
-        )
-        return results[0] if len(results) == 1 else results
+
+        def results(slots: Any, phis: Sequence[Any]) -> tuple[Any, ...]:
+            state = run(slots)
+            if len(phis):
+                state = state * jax_backend._global_phase(list(phis), self._dtype)
+            return tuple(
+                self._traced_measurement(mp, state, index, n_wires) for mp in tape.measurements
+            )
+
+        if tape.batch_size is None:
+            out = results(jax_backend._slot_array(params, self._dtype), phases)
+        else:
+            # A broadcast tape (ADR-0007 D3): every parameter becomes a column of length
+            # batch_size, and the batch runs as one vmap-ed program from the same compilation.
+            batch = tape.batch_size
+            out = jax.vmap(results)(
+                _columns(params, batch, self._dtype), _columns(phases, batch, self._dtype)
+            )
+        return out[0] if len(out) == 1 else out
 
     @staticmethod
     def _traced_measurement(mp: Any, state: Any, index: dict[Any, int], n_wires: int) -> Any:
@@ -649,6 +703,9 @@ class KetjetQubit(Device):  # type: ignore[misc]  # PennyLane ships no type hint
         return state
 
     def _run(self, tape: QuantumScript, rng: np.random.Generator) -> Any:
+        if tape.batch_size is not None and self._backend.name == "jax" and not tape.shots:
+            # A broadcast tape kept whole by preprocessing (D3): one batched run, NumPy results.
+            return _to_host(self._run_traced(tape))
         wire_order = self._wire_order(tape)
         state = self._simulate(tape, wire_order)
         if tape.shots:

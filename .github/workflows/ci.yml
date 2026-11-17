@@ -179,6 +179,7 @@ jobs:
           uv run --no-sync pytest -p no:cacheprovider -rfs
           tests/integration/test_pennylane_jax_interface.py
           tests/integration/test_pennylane_backprop.py
+          tests/integration/test_pennylane_broadcasting.py
 
   build:
     name: Build and smoke-test distributions

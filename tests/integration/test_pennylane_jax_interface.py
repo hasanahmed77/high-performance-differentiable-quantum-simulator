@@ -119,3 +119,42 @@ def test_best_still_means_adjoint_on_the_jax_backend(expected: Any) -> None:
         qml.devices.ExecutionConfig(gradient_method="best"), tape
     )
     assert config.gradient_method == "adjoint"
+
+
+# --------------------------------------------------------------------------- broadcasting (QS-506)
+
+
+def broadcast_energy(thetas: Any, x: Any) -> Any:
+    qml.RX(thetas, 0)
+    qml.CRot(x[1], x[0], 0.4, wires=[0, 1])
+    qml.IsingXX(thetas, wires=[1, 2])
+    qml.QFT(wires=[0, 1, 2])
+    qml.RZ(x[2], 2)
+    return qml.expval(0.5 * qml.PauliZ(0) @ qml.PauliX(2) - 1.1 * qml.PauliY(1))
+
+
+THETAS = jnp.linspace(-1.1, 2.3, 4)
+
+
+@pytest.mark.parametrize("method", METHODS)
+def test_broadcast_qnodes_match_default_qubit(method: str) -> None:
+    """ADR-0007 D3: values, Jacobians and jit equal default.qubit's, for every method."""
+    ours = _qnode(broadcast_energy, method, backend="jax")
+    ref = _qnode(broadcast_energy, "backprop", device="default.qubit")
+
+    np.testing.assert_allclose(ours(THETAS, X0), ref(THETAS, X0), atol=1e-10)
+    # PennyLane's parameter-shift can't differentiate broadcast parameters on any device (#4462).
+    for argnums in (1,) if method == "parameter-shift" else (0, 1):
+        expected = jax.jacrev(ref, argnums=argnums)(THETAS, X0)
+        np.testing.assert_allclose(
+            jax.jacrev(ours, argnums=argnums)(THETAS, X0), expected, atol=1e-10
+        )
+    np.testing.assert_allclose(jax.jit(ours)(THETAS, X0), ref(THETAS, X0), atol=1e-10)
+
+
+@pytest.mark.parametrize(("method", "simulations"), [("backprop", 1), ("adjoint", len(THETAS))])
+def test_a_broadcast_qnode_runs_once_under_backprop(method: str, simulations: int) -> None:
+    ours = _qnode(broadcast_energy, method, backend="jax")
+    with qml.Tracker(ours.device) as tracker:
+        ours(THETAS, X0)
+    assert tracker.totals["simulations"] == simulations
