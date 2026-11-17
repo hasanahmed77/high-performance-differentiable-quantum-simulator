@@ -60,7 +60,14 @@ def _run(device: Any, tape: QuantumScript, **kwargs: Any) -> Any:
 
 
 def _reference(tape: QuantumScript) -> Any:
-    return _run(qml.device("default.qubit", wires=WIRES), tape, diff_method=None)
+    """``default.qubit``'s result, one tape per batch entry.
+
+    PennyLane 0.44's ``default.qubit`` can't apply a broadcast ``GlobalPhase`` (0.45 can), so the
+    tape is split first; the results are stacked back into the broadcast shape.
+    """
+    tapes, postprocessing = qml.transforms.broadcast_expand(tape)
+    device = qml.device("default.qubit", wires=WIRES)
+    return postprocessing(qml.execute(tapes, device, diff_method=None))
 
 
 def _tapes_after_preprocessing(device: Any, tape: QuantumScript, config: Any) -> int:
