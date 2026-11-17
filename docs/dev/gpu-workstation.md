@@ -161,15 +161,24 @@ after showing:
 - a 16-qubit, 136-parameter circuit compiled on the GPU in both precisions, matching the NumPy oracle, and its
   `jax.jit(jax.grad)`.
 
-Then run the JAX backend's tests on the GPU:
+Then run the GPU suite (QS-607). It runs each computation on the GPU and on the CPU and compares them at the
+test suite's tolerances: states, probabilities, expectation values and Jacobians by backprop and adjoint, `vmap`
+batches, a 20-qubit circuit, `ketjet.qubit` and its samples, and the adjoint method's memory:
+
+```bash
+docker run --rm --gpus all ketjet-gpu pytest -p no:cacheprovider -q -m gpu tests/gpu
+```
+
+The CPU tests of the JAX backend also pass on the GPU:
 
 ```bash
 docker run --rm --gpus all ketjet-gpu pytest -p no:cacheprovider -q \
-  tests/unit/test_jax_backend.py tests/unit/test_compile_circuit.py tests/unit/test_backprop.py
+  tests/unit/test_jax_backend.py tests/unit/test_compile_circuit.py tests/unit/test_backprop.py \
+  tests/unit/test_batching.py tests/unit/test_jax_adjoint.py
 ```
 
-These were written for the CPU. If a complex64 test fails on the GPU by a small margin, record it below rather
-than loosening the test: GPU precision is QS-607's subject (Sprint 6).
+Their 12-qubit memory test skips on a GPU: the GPU's fixed scratch memory of about 4 MB is larger than such a
+state, so `tests/gpu` measures memory at 18 qubits instead.
 
 ## 6. Record the setup
 
