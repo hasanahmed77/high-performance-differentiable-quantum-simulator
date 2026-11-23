@@ -5,20 +5,20 @@
 | **Status** | In progress: plan approved by the PO in #149 |
 | **Started** | 2026-11-17 |
 | **Milestone** | `Sprint 06 – JAX backend II (batching, GPU)` |
-| **Sprint goal** | A user can batch circuits with `jax.vmap`, get adjoint gradients with depth-independent memory inside JAX programs, broadcast parameters through PennyLane, and run all of it on a GPU that CI tests. Release **v0.2.0**. |
+| **Sprint goal** | A user can batch circuits with `jax.vmap`, get adjoint gradients with depth-independent memory inside JAX programs, broadcast parameters through PennyLane, and run all of it on a GPU, tested by hand before every GPU PR (ADR-0007 D5, amended). Release **v0.2.0**. |
 
 ## Sprint backlog
 
 | ID | Story | Pts | Depends on | PR |
 |---|---|---|---|---|
-| QS-907 | A hardened self-hosted GPU runner on the workstation, and `gpu.yml` | 3 | ADR-0007 | |
+| ~~QS-907~~ | ~~A hardened self-hosted GPU runner on the workstation, and `gpu.yml`~~ **Dropped by the PO on 2026-11-18** (ADR-0007 D5, amended) | ~~3~~ 0 | ADR-0007 | |
 | QS-605 | `jax.vmap` batching over parameters (re-estimated from 5) | 3 | ADR-0007 | |
 | QS-606 | Adjoint inside JAX as a `jax.custom_vjp`, opt-in | 5 | QS-605 | |
 | QS-405 | One adjoint pass for many observables, proven on NumPy and JAX (re-estimated from 3) | 1 | QS-606 | |
 | QS-506 | PennyLane parameter broadcasting, as one batched execution on the JAX backend | 3 | QS-605 | |
-| QS-607 | The JAX backend on GPU: GPU-vs-CPU tolerance suite in `gpu.yml`, GPU docs | 3 | QS-907 | |
+| QS-607 | The JAX backend on GPU: GPU-vs-CPU tolerance suite, run by hand, GPU docs | 3 | n/a | #153 |
 | QS-1101 | ADR: benchmark methodology (**stretch**, from Sprint 7) | 2 | n/a | |
-| | **Total** | **20** (18 committed + 2 stretch) | | |
+| | **Total** | **17** (15 committed + 2 stretch; was 18 + 2 before QS-907 was dropped) | | |
 
 **Release:** v0.2.0 after the stories, through the existing pipeline (ADR-0007 D6).
 
@@ -32,6 +32,11 @@ and Sprint 7's benchmarks need it first.
   compilation. What's left is the error message, the tests, the docs and a timing, not new machinery.
 - **QS-405, 3 → 1.** The NumPy adjoint has made one backward pass for many observables since Sprint 3 (#121); no
   test asserts it. On JAX it comes with QS-606's backward rule. The story becomes the test on both backends.
+
+**GPU tests stay manual (PO decision, 2026-11-18).** The PO doesn't want the workstation reachable from GitHub
+Actions, so QS-907 is dropped and there is no `gpu.yml` (ADR-0007 D5, amended). Every PR that changes the JAX
+backend or `environment/` gets the GPU suite and `check_gpu.py` run by hand in the image, with the output pasted
+into the PR, and the same run on `main` goes into this sprint's review.
 
 **Sequencing.** *Changed with PO approval on 2026-11-17: QS-605 goes first, and QS-907 waits until the PO is at the
 workstation; until then GPU checks run by hand in the image and are pasted into each PR.* QS-907 was planned first, so every later JAX PR gets a GPU run before merging (ADR-0007 D5). Then the
@@ -52,12 +57,12 @@ suite to `gpu.yml`. QS-1101 can go in while a JAX PR waits on CI.
 
 | ID | Verification |
 |---|---|
-| QS-907 | `gpu.yml` triggers only on `workflow_dispatch`, `schedule` and `push` to `main` (a test reads the workflow); steps inside the job assert it isn't root, can't read `/mnt/c` and has no secrets; a green run on a branch and on `main` |
+| ~~QS-907~~ | Dropped. ~~`gpu.yml` triggers only on `workflow_dispatch`, `schedule` and `push` to `main` (a test reads the workflow); steps inside the job assert it isn't root, can't read `/mnt/c` and has no secrets; a green run on a branch and on `main`~~ |
 | QS-605 | **Differential:** `jax.vmap` values and gradients equal a loop on random circuits, both precisions; **trace count:** one compilation per structure, batched or not; a 2-D input raises the error that names `jax.vmap`; **timing:** batch speedup measured on the GPU and reported in the PR, including where it's 1× |
 | QS-606 | `expval_fn(..., diff_method="adjoint")` equals backprop and `gradients.jacobian(..., method="adjoint")` on random circuits, both precisions, with shared parameters, under `jit` and `vmap`; `jax.hessian` raises the documented error; **memory:** XLA's temporary memory for the adjoint gradient is flat from 20 to 400 layers, while backprop's grows; `JaxBackend.adjoint_jacobian` passes the cross-backend suite on the new path |
 | QS-405 | Counting gate applications: the Jacobian of 1 and of 8 observables both make one backward pass, on NumPy and on JAX |
 | QS-506 | Broadcast QNodes (`qml.RX(np.array([...]))`) on `backend="jax"` equal `default.qubit`: values, `jax.grad`, `jax.jit`; one execution, not one per batch entry; adjoint and parameter-shift on broadcast tapes still expand; the NumPy backend still expands; `pl-device-test` unchanged |
-| QS-607 | `gpu.yml` runs the JAX backend suite on the RTX 4060 and compares GPU against CPU at plan.md §6.3's tolerances; `check_gpu.py` passes; the GPU section of the docs is executed by a test on the CPU |
+| QS-607 | The GPU suite, run by hand, runs the JAX backend on the RTX 4060 and compares GPU against CPU at plan.md §6.3's tolerances; `check_gpu.py` passes; the GPU section of the docs is executed by a test on the CPU |
 | QS-1101 | The ADR states warm-up, repeats, statistics and the hardware record, and Sprint 7's suite follows it |
 | Sprint | **Integration:** a batch of H₂ VQE starting points, `jax.vmap`-ed with adjoint gradients in one jit-compiled step, on the GPU, all reaching the FCI energy. **Release:** v0.2.0 on PyPI, smoke-tested on three operating systems |
 
@@ -88,7 +93,7 @@ circuit(jnp.linspace(0, jnp.pi, 100))   # one batched execution, not 100
 ## Actions needed from the PO
 
 1. **Approve ADR-0007**, the re-estimates and the scope changes above, by merging this PR.
-2. **QS-907 needs you at the PC** for two steps I can't take alone:
+2. ~~**QS-907 needs you at the PC** for two steps I can't take alone:~~ Not needed: QS-907 was dropped on 2026-11-18.
    - registering the runner, which creates a credential for the repository, so I'll ask first;
    - turning on *Require approval for all outside collaborators* under Settings → Actions → General, a security
      setting that's yours to change.
