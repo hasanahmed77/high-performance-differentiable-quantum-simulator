@@ -26,3 +26,4 @@ Closes #
 - [ ] Public API documented (NumPy-style docstrings) and in the API reference
 - [ ] Changelog fragment added (or `skip-changelog` label)
 - [ ] ADR approved (if this touches a public API, the backend protocol or the IR)
+- [ ] GPU suite run by hand and pasted (if this touches the JAX backend or `environment/`): `pytest -m gpu tests/gpu` and `check_gpu.py` in the `ketjet-gpu` image

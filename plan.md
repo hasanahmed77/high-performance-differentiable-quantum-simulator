@@ -60,7 +60,7 @@ subscriptions. Every tool and service below is free for public open-source repos
 | Need | Free solution |
 |---|---|
 | CPU CI (Linux, macOS, Windows) | GitHub Actions standard runners (free and unlimited for public repos) |
-| GPU development and GPU CI | Owned RTX 4060 workstation (self-hosted runner) |
+| GPU development and GPU tests | Owned RTX 4060 workstation, tests run by hand (no self-hosted runner, §4.5) |
 | Large-scale GPU runs | Kaggle Notebooks (2× T4, 16 GB each, weekly free quota) and Google Colab free tier (1× T4) |
 | Coverage gate and reporting | pytest-cov + diff-cover inside CI (no account); Codecov optional for badges |
 | Docs and benchmark dashboard hosting | GitHub Pages |
@@ -256,7 +256,13 @@ Kaggle and Colab can't run custom images, so they install the same pinned lockfi
 notebook (`benchmarks/notebooks/`). Every benchmark records its hardware, driver and package versions, so
 results from different machines are comparable.
 
-**GPU CI (self-hosted runner) security model.** The repository is public, so the runner is hardened:
+**GPU tests run by hand (PO decision, 2026-11-18; ADR-0007 D5, amended).** The workstation isn't reachable from
+GitHub Actions in any form: there is no self-hosted runner and no `gpu.yml`. PRs that change the JAX backend or
+`environment/` get the GPU suite (`pytest -m gpu tests/gpu`) and `environment/check_gpu.py` run by hand in the
+pinned image, with the output pasted into the PR; the sprint-level DoD for GPU sprints requires the same run on
+`main` before the sprint review. The runner security model below was the original plan and isn't in use.
+
+**GPU CI (self-hosted runner) security model, not in use.** The repository is public, so the runner is hardened:
 - It runs inside WSL2 under a dedicated non-admin user, labelled `self-hosted, linux, gpu`.
 - `gpu.yml` triggers **only** on `workflow_dispatch`, `schedule` and `push` to `main`, and never on `pull_request`. Code from forks never reaches the workstation.
 - Repository setting: *require approval for all outside collaborators' workflows*.
@@ -268,7 +274,7 @@ results from different machines are comparable.
 | Sprint | Mac | GPU workstation | Free GPU tier (Kaggle/Colab) |
 |---|---|---|---|
 | 0–5 | ● | ○ (setup at end of Sprint 5) | |
-| 6 | ○ | ● JAX-GPU, runner live | |
+| 6 | ○ | ● JAX-GPU, GPU tests by hand | |
 | 7 | ● | ● GPU baselines | |
 | 8 | ● | | |
 | 9 | ● | ○ AVX2 / Windows wheel validation | |
@@ -376,7 +382,7 @@ Tolerances live in one module (`tests/tolerances.py`) and are never loosened inl
 | `ci.yml` | PR, push to main | lint (ruff), types (mypy), tests on {ubuntu, macos, windows} × {3.12, 3.13, 3.14, 3.15}, coverage gates (pytest-cov project ≥85%, diff-cover patch ≥90%), build + wheel smoke test, docs build |
 | `native.yml` | PR touching `native/` | CMake build, C++ tests, sanitizers, wheel build test |
 | `nightly.yml` | cron, daily | deep Hypothesis, 10k differential circuits, asv benchmarks, memory tests, packaging smoke |
-| `gpu.yml` | manual, weekly, push to `main` (never PRs) | JAX-GPU + CUDA tests and GPU benchmarks on the self-hosted RTX 4060 runner (§4.5) |
+| ~~`gpu.yml`~~ | Not created (§4.5): GPU tests run by hand | JAX-GPU + CUDA tests and GPU benchmarks, by hand on the RTX 4060 |
 | `release.yml` | tag `v*` | cibuildwheel wheels + sdist → TestPyPI → smoke → PyPI (Trusted Publishing) → GitHub Release |
 | `docs.yml` | push to main | Build and deploy the docs site |
 | Security | scheduled | Dependabot, CodeQL, `pip-audit` |
@@ -505,7 +511,7 @@ Tolerances live in one module (`tests/tolerances.py`) and are never loosened inl
 | QS-904 | As a researcher, I want GPU adjoint differentiation | P1 | 5 | Matches CPU adjoint |
 | QS-905 | As a user, I want complex64 and complex128 on GPU | P0 | 2 | Both pass with their tolerances |
 | QS-906 | As a user, I want an installable GPU package (separate CUDA wheel extra, e.g. `pip install ketjet[cuda12]`) | P1 | 5 | Installs on a clean CUDA 12 machine |
-| QS-907 | As a maintainer, I want a hardened self-hosted GPU CI runner on the workstation | P0 | 3 | Meets the §4.5 security model; `gpu.yml` never triggers on PRs; green run on `main` |
+| QS-907 | ~~As a maintainer, I want a hardened self-hosted GPU CI runner on the workstation~~ **Dropped by the PO on 2026-11-18** | n/a | 0 | Meets the §4.5 security model; `gpu.yml` never triggers on PRs; green run on `main` |
 | QS-908 | As the PO, I want a 30-qubit run on a free-tier T4 (Kaggle or Colab) to validate G5 | P1 | 2 | Versioned notebook installs the pinned lockfile; results and hardware recorded in the benchmark JSON; $0 cost |
 
 ### E10: Multi-GPU and distributed (stretch)
@@ -705,7 +711,8 @@ and sprint durations (§4.2) are used to forecast the remaining releases, and th
 | Free GPU tiers change their quotas or availability | Low | Medium | Free-tier results are nice-to-have, never release-blocking; Colab is the fallback for Kaggle; the 4060 covers everything else |
 | Zero budget limits multi-GPU to 2 devices | Low | Certain | 1 → 2 GPU measurements prove the distributed design and its communication cost; larger scaling is analysed with emulated devices and labelled as such |
 | GPU work is split across two machines (Mac + workstation) | Medium | Medium | Pinned container image; GPU code behind the backend protocol so CPU work is never blocked; all state lives in git, so switching machines is a `git pull` |
-| Self-hosted runner on a public repo | High | Low | Hardened per §4.5: no PR triggers, outside-collaborator approval, ephemeral container, no secrets |
+| Self-hosted runner on a public repo | n/a | n/a | Avoided: no runner (§4.5, PO decision 2026-11-18) |
+| A GPU regression lands between manual runs | Medium | Medium | The GPU suite runs by hand before every PR that touches the JAX backend or `environment/`, and on `main` before each GPU sprint's review |
 | WSL2 GPU passthrough or driver issues | Medium | Low | Set up and validated one sprint early (QS-112, Sprint 5); pinned NVIDIA driver and CUDA versions |
 | PennyLane device API changes | Medium | Medium | Pin a tested range; CI against latest and minimum; follow PennyLane release notes |
 | Can't beat `lightning`/Qulacs on CPU | Medium | High | That's expected: publish honest results; compete on batching + autodiff (our design focus) rather than raw single-circuit CPU speed |
