@@ -268,6 +268,8 @@ def test_adjoint_memory_is_independent_of_depth_and_backprops_is_not() -> None:
     JAX 0.10's XLA doesn't keep the barriers' schedule flat: there the adjoint grows by ~0.4
     states per layer, against backprop's ~12, so only that ratio is checked (ADR-0007 D2).
     """
+    if jax.default_backend() != "cpu":
+        pytest.skip("a GPU's fixed scratch memory hides 12-qubit states; tests/gpu measures it")
     shallow, deep = 4, 12
     adjoint = [_temp_states(12, depth, "adjoint") for depth in (shallow, deep)]
     backprop = [_temp_states(12, depth, "backprop") for depth in (shallow, deep)]
