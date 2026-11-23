@@ -48,6 +48,7 @@ nav:
       - "ADR-0005: PennyLane device": adr/0005-pennylane-device.md
       - "ADR-0006: JAX backend": adr/0006-jax-backend.md
       - "ADR-0007: JAX batching, adjoint and GPU": adr/0007-jax-batching-adjoint-gpu.md
+      - "ADR-0008: Benchmark methodology": adr/0008-benchmark-methodology.md
   - Sprint reports:
       - "Sprint 00: Foundations": sprints/sprint-00.md
       - "Sprint 01: The engine": sprints/sprint-01.md
