@@ -2,11 +2,11 @@
 
 **A high-performance differentiable quantum statevector simulator, usable as a PennyLane device.**
 
-!!! warning "Pre-release"
-    ketjet is in its foundations phase. The first usable release, **v0.1.0**, is planned for the end of
-    Sprint 4. This site grows with every sprint.
+!!! warning "Alpha"
+    The current release is **v0.2.0**: the NumPy reference simulator and a JAX backend, as a PennyLane device.
+    The API can still change before v1.0.0. This site grows with every sprint.
 
-## What it will be
+## What it is
 
 ketjet simulates quantum circuits by evolving a statevector of $2^n$ complex amplitudes. It is designed around
 three goals, in order:
@@ -17,7 +17,7 @@ three goals, in order:
 3. **Then honest about its speed.** Reproducible benchmarks against existing simulators, including the cases where
    ketjet loses.
 
-## Planned features
+## Features and roadmap
 
 | Area | Features | Release |
 |---|---|---|
