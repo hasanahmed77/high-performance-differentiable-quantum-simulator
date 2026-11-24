@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Stories done, reviewed in this report; v0.2.0 not released yet. Plan approved by the PO in #149 |
-| **Finished** | 2026-11-24 (stories) |
+| **Status** | Done. v0.2.0 released on 2026-11-24. Plan approved by the PO in #149 |
+| **Finished** | 2026-11-24 |
 | **Started** | 2026-11-17 |
 | **Milestone** | `Sprint 06 – JAX backend II (batching, GPU)` |
 | **Sprint goal** | A user can batch circuits with `jax.vmap`, get adjoint gradients with depth-independent memory inside JAX programs, broadcast parameters through PennyLane, and run all of it on a GPU, tested by hand before every GPU PR (ADR-0007 D5, amended). Release **v0.2.0**. |
