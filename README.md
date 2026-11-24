@@ -9,8 +9,8 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-green)](https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator/blob/main/LICENSE)
 [![Type checked: mypy strict](https://img.shields.io/badge/types-mypy%20strict-informational)](https://github.com/hasanahmed77/high-performance-differentiable-quantum-simulator/blob/main/pyproject.toml)
 
-> **Status: alpha (v0.1.0).** The NumPy reference simulator, with exact gradients, as a PennyLane device. The
-> faster backends (JAX, C++, CUDA) come next; see the [roadmap](#roadmap) and the
+> **Status: alpha (v0.2.0).** The NumPy reference simulator and a JAX backend (compiled circuits, gradients,
+> batching, GPU), as a PennyLane device. The native backends (C++, CUDA) come next; see the [roadmap](#roadmap) and the
 > [project board](https://github.com/users/hasanahmed77/projects/2).
 
 ## Why
@@ -147,8 +147,8 @@ pip install "ketjet[pennylane] @ git+https://github.com/hasanahmed77/high-perfor
 | Release | Adds |
 |---|---|
 | **v0.1.0** (released) | NumPy reference simulator, exact gradients, PennyLane device |
-| v0.2.0 | JAX backend: jit, vmap batching, GPU, backprop and adjoint inside JAX; then the first benchmarks |
-| v0.3.0 | Native C++ backend: SIMD and OpenMP, with prebuilt wheels |
+| **v0.2.0** (released) | JAX backend: jit, vmap batching, GPU, backprop and adjoint inside JAX |
+| v0.3.0 | The first benchmarks, then a native C++ backend: SIMD and OpenMP, with prebuilt wheels |
 | v0.4.0 | Gate fusion and autotuning, with a CPU roofline and a performance report |
 | v0.5.0 | CUDA backend, with GPU adjoint |
 | v1.0.0 | A stable API, complete docs and a technical write-up |
