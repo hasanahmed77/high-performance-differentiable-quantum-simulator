@@ -530,10 +530,11 @@ Tolerances live in one module (`tests/tolerances.py`) and are never loosened inl
 | QS-1101 | ADR: benchmark methodology (warmup, repeats, reported statistics, hardware disclosure) | P0 | 2 | Approved |
 | QS-1102 | As the PO, I want a benchmark suite: single-gate throughput, QFT, random circuits, a VQE ansatz with gradients, batched QML | P0 | 5 | Scripts reproducible with one command; JSON results committed |
 | QS-1103 | As the PO, I want comparisons vs `default.qubit`, `lightning.qubit`, `lightning.gpu`, Qiskit Aer and Qulacs | P0 | 5 | Same circuits, same hardware; losses reported |
-| QS-1104 | As the PO, I want auto-generated plots (time vs qubits, speedup, gradient cost) | P0 | 3 | `make plots` regenerates every figure |
-| QS-1105 | As a maintainer, I want asv performance-regression tracking, nightly | P1 | 3 | Dashboard published; >5% regression opens an issue |
+| QS-1104 | As the PO, I want auto-generated plots (time vs qubits, speedup, gradient cost) | P0 | 3 | `uv run python -m benchmarks.plots` regenerates every figure |
+| QS-1105 | As a maintainer, I want asv performance-regression tracking, nightly | P1 | 3 | Dashboard published; >10% regression opens an issue (ADR-0008 D7) |
 | QS-1106 | As the PO, I want a roofline analysis (CPU + GPU) of the kernels | P1 | 5 | Measured bandwidth vs peak (STREAM / Nsight Compute); plot + explanation |
 | QS-1107 | As the PO, I want a profiling and optimization report: memory, fusion, batching, threading | P0 | 3 | `docs/performance.md` with before/after numbers |
+| QS-1108 | As the PO, I want to know how many qubits the JAX backend fits on the GPU, for each gradient method and precision | P1 | 2 | Measured on the RTX 4060; §4.5 corrected |
 
 ### E12: Docs, release and community
 
@@ -604,10 +605,10 @@ docs deployed, a sprint report and a retro. Test focus lists the test types that
 
 ### Sprint 7: Benchmarks and first performance report
 **Goal:** Honest, reproducible numbers against the competition.
-**Stories:** QS-1101, 1102, 1103, 1104, 1105, 407
+**Stories:** QS-1101 (done in Sprint 6), 1102, 1103, 1104, 1105, 407, 1108 (stretch)
 **Test focus:** Performance-regression tracking switched on; benchmark scripts tested so they can't rot.
 **Demo:** First comparison plots, including where we lose.
-**Environment:** Mac for CPU benchmarks; 🖥️ GPU workstation for `lightning.gpu` and JAX-GPU baselines.
+**Environment:** 🖥️ GPU workstation for everything, in the `ketjet-gpu` image (no Mac; changed in Sprint 7's plan); GPU comparisons run by hand.
 
 ### Sprint 8: Native core I
 **Goal:** A C++ extension that builds everywhere and is correct.

@@ -57,6 +57,7 @@ nav:
       - "Sprint 04: PennyLane device and v0.1.0": sprints/sprint-04.md
       - "Sprint 05: JAX backend I": sprints/sprint-05.md
       - "Sprint 06: JAX backend II and v0.2.0": sprints/sprint-06.md
+      - "Sprint 07: Benchmarks": sprints/sprint-07.md
   - Development:
       - "Development": development.md
       - "GPU workstation": dev/gpu-workstation.md
