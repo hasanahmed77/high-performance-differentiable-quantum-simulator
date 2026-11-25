@@ -2,7 +2,7 @@
 
 Run with ``uv run python benchmarks/specialized_kernels.py``. It prints a Markdown table of the
 best-of-``REPEATS`` time per gate application, as the backend applies it (matrix construction
-included), and the speedup over ``apply_matrix``. The asv suite (QS-1102) will replace this.
+included), and the speedup over ``apply_matrix``. The nightly asv suite (QS-1105) will track it.
 """
 
 import platform

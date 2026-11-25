@@ -23,3 +23,6 @@ site/
 .vscode/
 .idea/
 .DS_Store
+
+# Benchmarks: quick and smoke runs are never published (ADR-0008)
+benchmarks/results/unpublished-*.json

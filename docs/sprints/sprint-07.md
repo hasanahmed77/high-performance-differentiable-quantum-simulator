@@ -11,7 +11,7 @@
 
 | ID | Story | Pts | Depends on | PR |
 |---|---|---|---|---|
-| QS-1102 | Benchmark suite and harness: single-gate throughput, QFT, random circuits, a VQE ansatz with gradients, batched QML; JSON results committed | 5 | ADR-0008 | |
+| QS-1102 | Benchmark suite and harness: single-gate throughput, QFT, random circuits, a VQE ansatz with gradients, batched QML; JSON results committed | 5 | ADR-0008 | #161 |
 | QS-1103 | Comparisons with `default.qubit`, `lightning.qubit`, Qiskit Aer and Qulacs on the CPU; `lightning.gpu` and Aer on the GPU, run by hand | 5 | QS-1102 | |
 | QS-1104 | Plots regenerated from the JSON by one command: time against qubits, speedup, gradient cost | 3 | QS-1102 | |
 | QS-1105 | Nightly asv regression tracking, a published dashboard, and an issue opened on a regression over 10% | 3 | n/a | |
