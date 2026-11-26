@@ -10,6 +10,9 @@ oracle in complex128 (ADR-0008 D1). Runners:
     with backprop. Synchronized with ``block_until_ready``.
 ``ketjet-jax-adjoint``
     As ``ketjet-jax``, with ``diff_method="adjoint"``; gradient benchmarks only.
+
+The other simulators' runners (QS-1103) are in :mod:`benchmarks.libraries`. They run on the CPU,
+in the precisions each library has.
 """
 
 from collections.abc import Callable, Iterable, Sequence
@@ -21,9 +24,11 @@ import numpy.typing as npt
 from tests.tolerances import Tolerance, tolerance_for  # one source of tolerances (§6.3)
 
 from benchmarks.circuits import BENCHMARKS, GRADIENT_BENCHMARKS, QML_BATCH, Spec
+from benchmarks.libraries import LIBRARY_RUNNERS, library_options, prepare_library, supports
 from ketjet import gradients
 
-RUNNERS: Final = ("ketjet-numpy", "ketjet-jax", "ketjet-jax-adjoint")
+KETJET_RUNNERS: Final = ("ketjet-numpy", "ketjet-jax", "ketjet-jax-adjoint")
+RUNNERS: Final = (*KETJET_RUNNERS, *LIBRARY_RUNNERS)
 JAX_RUNNERS: Final = frozenset({"ketjet-jax", "ketjet-jax-adjoint"})
 DEVICES: Final = ("cpu", "gpu")
 PRECISIONS: Final = ("complex128", "complex64")
@@ -79,6 +84,7 @@ def cases(
     """Every case of a run: ``sizes`` overrides :data:`SIZES` for every benchmark.
 
     The adjoint runner is used only for gradient benchmarks, and the GPU only by JAX runners.
+    Other libraries run where :func:`benchmarks.libraries.supports` says they can, on the CPU.
     """
     chosen_runners = tuple(runners)
     for name in (*chosen_runners, device, precision):
@@ -93,6 +99,9 @@ def cases(
             if runner == "ketjet-jax-adjoint" and benchmark not in GRADIENT_BENCHMARKS:
                 continue
             if device == "gpu" and runner not in JAX_RUNNERS:
+                continue
+            gradient = benchmark in GRADIENT_BENCHMARKS
+            if runner in LIBRARY_RUNNERS and not supports(runner, benchmark, precision, gradient):
                 continue
             result.extend(
                 Case(benchmark, runner, n, device, precision)
@@ -221,5 +230,13 @@ def prepare(case: Case) -> Prepared:
         "parameters": len(spec.circuit.parameters),
         "batch": QML_BATCH if case.benchmark == "qml-batch" else None,
     }
-    call = _jax(case, spec, info) if case.runner in JAX_RUNNERS else _numpy(case, spec)
+    if case.runner in LIBRARY_RUNNERS:
+        if case.device != "cpu":
+            raise RuntimeError(f"{case.id}: the other libraries run on the CPU only (QS-1103).")
+        call = prepare_library(case.runner, case.benchmark, spec, case.precision)
+        info["options"] = library_options(case.runner, case.precision)
+    elif case.runner in JAX_RUNNERS:
+        call = _jax(case, spec, info)
+    else:
+        call = _numpy(case, spec)
     return Prepared(call, _checker(reference, tolerance, case), info)

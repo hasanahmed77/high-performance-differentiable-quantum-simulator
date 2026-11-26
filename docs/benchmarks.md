@@ -1,9 +1,8 @@
 # Benchmarks
 
-ketjet's benchmark suite times five kinds of work on the NumPy and JAX backends and writes the results, with a
-record of the machine, to `benchmarks/results/`. How it measures is decided in
-[ADR-0008](adr/0008-benchmark-methodology.md). Comparisons with other simulators (Sprint 7, QS-1103) and plots
-(QS-1104) build on it.
+ketjet's benchmark suite times five kinds of work on the NumPy and JAX backends and on four other simulators,
+and writes the results, with a record of the machine, to `benchmarks/results/`. How it measures is decided in
+[ADR-0008](adr/0008-benchmark-methodology.md). Plots (QS-1104) build on it.
 
 ## The benchmarks
 
@@ -27,6 +26,31 @@ Each benchmark runs on these **runners**:
 - `ketjet-jax`: the JAX backend, compiled, with JAX's own reverse mode for gradients and `jax.vmap` for batches.
 - `ketjet-jax-adjoint`: the same with `diff_method="adjoint"`, for the two gradient benchmarks.
 
+And the other simulators, on the CPU (QS-1103):
+
+| Runner | Library | Gradients | Batches | Precisions |
+|---|---|---|---|---|
+| `pennylane-default` | PennyLane's `default.qubit` | backprop, with autograd | a Python loop (see below) | complex128 |
+| `pennylane-lightning` | `lightning.qubit`, PennyLane's C++ simulator | its adjoint method | parameter broadcasting | complex128, complex64 |
+| `qiskit-aer` | Qiskit Aer's statevector simulator | none of its own: state benchmarks only | | complex128, complex64 |
+| `qulacs` | Qulacs | `ParametricQuantumCircuit.backprop` | a Python loop | complex128 |
+
+Each benchmark circuit is built once, as a ketjet circuit, and translated gate by gate into each library's own
+API (`benchmarks/libraries.py`), with the same gates and angles. Each library runs with its default options
+and all cores, and its circuit is built outside the timer. Every translation is checked against ketjet's
+oracle before it's timed, which is what found the conventions that differ:
+
+- Qiskit and Qulacs number qubits from the least significant bit, ketjet and PennyLane from the most.
+- Qulacs's rotation gates turn the opposite way to everyone else's, so its angles and gradients are negated.
+- Qiskit's default transpiler removes the QFT's final SWAPs and permutes the qubits instead, which returns a
+  different state. Aer runs every benchmark gate natively, so the circuits aren't transpiled.
+- `default.qubit`'s parameter broadcasting fails under autograd from 12 qubits, with "shape-mismatch for
+  sum" (PennyLane 0.45.1). Its QML batch is a Python loop, as ketjet's NumPy runner's and Qulacs's are.
+
+The libraries are pinned in their own dependency group, `bench`, which users and the normal test run never
+install. CI installs it in one job and checks every translation at 3 and 4 qubits, in both precisions where a
+library has them (`tests/integration/test_comparison_libraries.py`).
+
 ## How it measures
 
 Following ADR-0008:
@@ -48,9 +72,11 @@ Following ADR-0008:
 In the GPU workstation image ([GPU workstation](dev/gpu-workstation.md)), from the repository:
 
 ```bash
-uv run python -m benchmarks.run                    # everything on the CPU: about 40 minutes
+uv sync --group bench                              # the other simulators
+uv run python -m benchmarks.run                    # everything on the CPU
 uv run python -m benchmarks.run --device gpu       # the JAX runners on the GPU
 uv run python -m benchmarks.run --benchmarks qft,vqe-grad --sizes 8,12 --quick
+uv run python -m benchmarks.compare benchmarks/results/<file>.json   # ketjet against the others
 ```
 
 `--quick` (one process, five samples) and `--smoke` (one call, 3 qubits) are for development. They are written as
@@ -70,6 +96,9 @@ Each run writes one JSON file, `benchmarks/results/<date>-<device>-<precision>.j
 - `settings`: the sample settings used, and whether they're the published ones.
 - `cases`: one entry per benchmark, runner and size, with the median, quartiles, minimum, first call, gate and
   parameter counts, and every process's own samples.
+
+- `failed`: any case that failed, with the end of its error: an exception, a wrong answer or running out of
+  memory. The larger sizes of the same benchmark and runner are then skipped, and the run goes on.
 
 A file without its machine record is rejected (`benchmarks.harness.validate`).
 
@@ -106,4 +135,49 @@ What they show:
 - **Noise:** the median spread between the three processes was 1.8% on the CPU and 1.4% on the GPU. Nine CPU
   cases spread by more than 5%, all of them JAX cases, with the largest 21% (`vqe-grad`, adjoint, 16 qubits).
 
-Comparisons with other simulators come next (QS-1103).
+## Against the other simulators (2026-11-26, CPU)
+
+The same machine and image as above, at commit `73a0669`, with PennyLane 0.45.1, `pennylane-lightning` 0.45.0,
+Qiskit 2.6.2 with Aer 0.18.4, and Qulacs 0.6.14. Every library ran in the same session, one case after another,
+all in complex128. The table shows ketjet's fastest runner (always compiled JAX here) against each library at the
+largest size. The full numbers are in `benchmarks/results/2026-11-26-cpu-complex128.json` and
+`2026-11-26-cpu-complex64.json`, and the table is regenerated with
+`uv run python -m benchmarks.compare <file>` (`--all-sizes` for every size).
+
+| Benchmark | Qubits | ketjet, ms | `default.qubit` | `lightning.qubit` | Qiskit Aer | Qulacs |
+|---|---|---|---|---|---|---|
+| `gate-h` | 20 | 1,132 | 1,591: ketjet **1.4x faster** | 266: ketjet 4.3x slower | 22: ketjet **52x slower** | 243: ketjet 4.7x slower |
+| `gate-rz` | 20 | 172 | 1,549: ketjet **9.0x faster** | 271: ketjet **1.6x faster** | 105: ketjet 1.6x slower | 225: ketjet **1.3x faster** |
+| `gate-cnot` | 20 | 465 | 606: ketjet **1.3x faster** | 107: ketjet 4.3x slower | 72: ketjet 6.5x slower | 83: ketjet 5.6x slower |
+| `qft` | 20 | 894 | 1,987: ketjet **2.2x faster** | 205: ketjet 4.4x slower | 156: ketjet 5.7x slower | 199: ketjet 4.5x slower |
+| `random` | 20 | 934 | 1,731: ketjet **1.9x faster** | 268: ketjet 3.5x slower | 122: ketjet 7.7x slower | 228: ketjet 4.1x slower |
+| `vqe-grad` | 20 | 2,841 | 11,746: ketjet **4.1x faster** | 2,002: ketjet 1.4x slower | no gradients | 1,927: ketjet 1.5x slower |
+| `qml-batch` | 16 | 2,447 | 6,113: ketjet **2.5x faster** | 398: ketjet 6.1x slower | no gradients | 485: ketjet 5.0x slower |
+
+What it shows:
+
+- **ketjet loses on the CPU, as expected.** At the largest sizes it is clearly slower in 17 of 26 comparisons,
+  and in 53 of 127 across all sizes. The compiled C++ simulators are 1.4 to 7.7 times faster on most circuits.
+  ketjet's own compiled backend is Sprint 8's work (goal G3), and these are the numbers it has to beat.
+- **ketjet beats `default.qubit` everywhere** at 20 qubits, by 1.3 to 9 times, and it wins on diagonal gates
+  (`gate-rz`) against `lightning.qubit` and Qulacs: JAX fuses the phases.
+- **Qiskit Aer's lead on gate layers comes from gate fusion.** It merges neighbouring gates before it
+  simulates, which is on by default. Ten layers of Hadamards, which cancel in pairs, become almost nothing, so it
+  is 52 times faster there. Its lead on the QFT and random circuits, 5.7 and 7.7 times, is the more honest
+  measure.
+- **On small circuits ketjet's JAX runner is often fastest,** because it has the least overhead per call: for
+  `vqe-grad` it is 34 times faster than `lightning.qubit` at 4 qubits, and `lightning.qubit` overtakes it
+  between 12 and 16 qubits. Qulacs, which has the least overhead of all, overtakes it at 8 qubits, and is faster
+  at every size on every state benchmark except `gate-rz` at 20 qubits.
+- **In complex64** (`lightning.qubit` and Aer only), ketjet is slower in all 12 comparisons, by 1.2 to 7.5
+  times, and by 28 times for Aer on `gate-h`.
+
+**Noise and a rerun.** The median spread between the three processes was 1.6% in complex128 and 1.8% in
+complex64. ADR-0008 asks for a rerun of the headline cases on another day to land within 5%. ketjet's cases
+from 2026-11-24 were rerun in this session, and they came out **9% slower** (median), with only 8 of 77 within
+5%. ketjet's code didn't change between the two runs, and the JAX cases slowed as much as the NumPy ones, so the
+machine itself ran slower; the first run was in the evening, this one overnight. Comparisons within one run, like
+the table above, are unaffected, but numbers from different days shouldn't be compared until the machine's
+state (its power mode, CPU clock and temperature) is recorded and held steady.
+
+The GPU comparisons, with `lightning.gpu` and Qiskit Aer on the GPU, are run by hand and come next.

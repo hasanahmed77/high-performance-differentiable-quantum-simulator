@@ -10,6 +10,8 @@ repos:
       - id: check-merge-conflict
       - id: check-added-large-files
         args: ["--maxkb=500"]
+        # Benchmark results are data, committed on purpose (ADR-0008 D6); a full run is ~0.5 MB.
+        exclude: ^benchmarks/results/
   - repo: local
     hooks:
       - id: ruff-check
