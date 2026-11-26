@@ -75,6 +75,14 @@ docs = [
     "mkdocs-material>=9.6",
     "mkdocstrings[python]>=0.30",
 ]
+bench = [
+    # The other simulators ketjet is compared with (QS-1103). Pinned exactly, so a rerun installs
+    # the same versions (ADR-0008 D5). Never needed by users or the normal test run.
+    "pennylane-lightning==0.45.0",
+    "qiskit==2.6.2",
+    "qiskit-aer==0.18.4",
+    "qulacs==0.6.14",
+]
 gpu = [
     # The GPU workstation image (environment/gpu.Dockerfile, QS-112). The CUDA 12 runtime comes as
     # pip wheels, matched to jaxlib, so the image needs only the host's NVIDIA driver. Linux only.
@@ -163,6 +171,13 @@ enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
 [[tool.mypy.overrides]]
 module = ["hypothesis.*"]
 follow_untyped_imports = true
+
+[[tool.mypy.overrides]]
+# The comparison libraries (the bench group, QS-1103) are typed as Any, whether or not they're
+# installed, so mypy gives the same answer in CI, which doesn't install them.
+module = ["qiskit", "qiskit.*", "qiskit_aer", "qiskit_aer.*", "qulacs", "qulacs.*"]
+follow_imports = "skip"
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 # PennyLane is a test-only dependency and ships no type information.

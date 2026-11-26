@@ -16,9 +16,18 @@ pytest.importorskip("jax")
 
 import jax
 from benchmarks import harness
-from benchmarks.cases import SMOKE_SIZE, Case, WrongResultError, cases, prepare
+from benchmarks import run as runner
+from benchmarks.cases import (
+    JAX_RUNNERS,
+    KETJET_RUNNERS,
+    SMOKE_SIZE,
+    Case,
+    WrongResultError,
+    cases,
+    prepare,
+)
 from benchmarks.circuits import BENCHMARKS, GRADIENT_BENCHMARKS, ising, qft
-from benchmarks.run import main, run_case
+from benchmarks.run import CaseFailedError, main, run_case
 
 from ketjet.observables import Sum
 
@@ -31,7 +40,9 @@ def _restore_x64() -> Iterator[None]:
     jax.config.update("jax_enable_x64", x64)  # type: ignore[no-untyped-call]
 
 
-@pytest.mark.parametrize("case", cases(sizes=[SMOKE_SIZE]), ids=lambda c: c.id)
+@pytest.mark.parametrize(
+    "case", cases(runners=KETJET_RUNNERS, sizes=[SMOKE_SIZE]), ids=lambda c: c.id
+)
 def test_every_benchmark_runs_and_matches_the_oracle(case: Case) -> None:
     result = run_case(case, harness.SMOKE)
     assert result["first_call_s"] > 0
@@ -41,7 +52,7 @@ def test_every_benchmark_runs_and_matches_the_oracle(case: Case) -> None:
 
 @pytest.mark.parametrize(
     "case",
-    [c for c in cases(sizes=[SMOKE_SIZE], precision="complex64") if c.runner != "ketjet-numpy"],
+    list(cases(runners=sorted(JAX_RUNNERS), sizes=[SMOKE_SIZE], precision="complex64")),
     ids=lambda c: c.id,
 )
 def test_jax_runners_in_complex64(case: Case) -> None:
@@ -123,3 +134,32 @@ def test_the_runner_writes_a_valid_file_from_separate_processes(tmp_path: Path) 
     assert len(pids) == len(set(pids)) == 2
     assert os.getpid() not in pids
     assert [c["n_qubits"] for c in data["cases"]] == [SMOKE_SIZE, SMOKE_SIZE]
+
+
+def test_a_failed_case_is_recorded_and_the_run_goes_on(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A case that fails is listed with its error; its larger sizes are skipped, the rest run."""
+    real = runner._in_subprocess
+
+    def flaky(case: Case, settings: harness.Settings) -> dict[str, object]:
+        if case.benchmark == "gate-h":
+            raise CaseFailedError(f"{case.id} failed with exit code -9 (killed: out of memory?)")
+        return real(case, settings)
+
+    monkeypatch.setattr(runner, "_in_subprocess", flaky)
+    out = tmp_path / "result.json"
+    argv = ["--benchmarks", "gate-h,gate-rz", "--runners", "ketjet-numpy", "--sizes", "2,3"]
+    assert main([*argv, "--smoke", "--out", str(out)]) == 1
+    data = json.loads(out.read_text(encoding="utf-8"))
+    harness.validate(data)
+    assert [c["id"] for c in data["cases"]] == [
+        "gate-rz/ketjet-numpy/cpu/complex128/n2",
+        "gate-rz/ketjet-numpy/cpu/complex128/n3",
+    ]
+    assert [f["id"] for f in data["failed"]] == [
+        "gate-h/ketjet-numpy/cpu/complex128/n2",
+        "gate-h/ketjet-numpy/cpu/complex128/n3",
+    ]
+    assert "out of memory" in data["failed"][0]["error"]
+    assert data["failed"][1]["error"] == "Not run: a smaller size failed."

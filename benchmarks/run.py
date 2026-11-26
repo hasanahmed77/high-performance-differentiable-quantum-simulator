@@ -9,6 +9,10 @@ Examples::
 Each case runs in its own subprocess, ``settings.processes`` times (ADR-0008 D3). Only the
 default settings produce numbers for publishing; ``--quick`` and ``--smoke`` runs are written as
 ``unpublished-*.json``, which git ignores.
+
+A case that fails (a wrong answer, an error, or running out of memory) is recorded under
+``failed`` with the end of its error, and the larger sizes of the same benchmark and runner are
+skipped; the rest of the run goes on, and the command exits with 1.
 """
 
 import argparse
@@ -29,6 +33,10 @@ from benchmarks.circuits import BENCHMARKS
 
 ROOT: Final = Path(__file__).resolve().parent.parent
 RESULTS: Final = ROOT / "benchmarks" / "results"
+
+
+class CaseFailedError(RuntimeError):
+    """A case's subprocess failed: an error, a wrong answer, or the system killed it."""
 
 
 def run_case(case: Case, settings: harness.Settings) -> dict[str, Any]:
@@ -58,7 +66,9 @@ def _in_subprocess(case: Case, settings: harness.Settings) -> dict[str, Any]:
     ]
     done = subprocess.run(command, capture_output=True, text=True, cwd=ROOT, env=env, check=False)
     if done.returncode != 0:
-        raise RuntimeError(f"{case.id} failed:\n{done.stderr[-4000:]}")
+        killed = " (killed: out of memory?)" if done.returncode < 0 else ""
+        message = f"{case.id} failed with exit code {done.returncode}{killed}:\n"
+        raise CaseFailedError(message + done.stderr[-2000:])
     result: dict[str, Any] = json.loads(done.stdout.strip().splitlines()[-1])
     return result
 
@@ -68,9 +78,21 @@ def run(
 ) -> dict[str, Any]:
     """Time every case, each in ``settings.processes`` fresh processes, and return the results."""
     results = []
+    failed: list[dict[str, str]] = []
+    gave_up: set[tuple[str, str]] = set()
     for i, case in enumerate(selected, start=1):
         start = time.perf_counter()
-        timings = [_in_subprocess(case, settings) for _ in range(settings.processes)]
+        if (case.benchmark, case.runner) in gave_up:
+            failed.append({"id": case.id, "error": "Not run: a smaller size failed."})
+            print(f"[{i}/{len(selected)}] {case.id}: skipped, a smaller size failed", flush=True)
+            continue
+        try:
+            timings = [_in_subprocess(case, settings) for _ in range(settings.processes)]
+        except CaseFailedError as error:
+            failed.append({"id": case.id, "error": str(error)})
+            gave_up.add((case.benchmark, case.runner))
+            print(f"[{i}/{len(selected)}] {error}", flush=True)
+            continue
         info = timings[0].pop("info")
         for timing in timings[1:]:
             timing.pop("info")
@@ -98,6 +120,7 @@ def run(
         "machine": machine,
         "settings": asdict(settings),
         "cases": results,
+        "failed": failed,
     }
     harness.validate(data)
     return data
@@ -146,8 +169,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     out: Path = args.out or RESULTS / f"{prefix}{date}-{args.device}-{args.precision}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(data, indent=1) + "\n", encoding="utf-8")
-    print(f"Wrote {len(data['cases'])} cases to {out}")
-    return 0
+    print(f"Wrote {len(data['cases'])} cases to {out}; {len(data['failed'])} failed")
+    return 1 if data["failed"] else 0
 
 
 if __name__ == "__main__":

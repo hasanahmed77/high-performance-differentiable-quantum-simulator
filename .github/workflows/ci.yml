@@ -140,6 +140,21 @@ jobs:
       # --no-sync: a plain `uv run` would re-resolve to the highest versions.
       - run: uv run --no-sync pytest -p no:cacheprovider
 
+  comparisons:
+    name: Comparison libraries agree with the oracle
+    # The other simulators' translations of every benchmark circuit (QS-1103), checked against
+    # ketjet's NumPy oracle at small sizes, so a translation can't drift unnoticed. The bench group
+    # is installed only here.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+          python-version: "3.13"
+      - run: uv sync --group bench
+      - run: uv run --no-sync pytest -p no:cacheprovider tests/integration/test_comparison_libraries.py -rs
+
   conformance:
     name: PennyLane device suite (pl-device-test)
     # PennyLane's own device tests, in exact and in shot mode, on every backend (ADR-0005 D6,
@@ -210,7 +225,7 @@ jobs:
     name: CI success
     # Single required status check for branch protection; fails if any job failed or was cancelled.
     if: always()
-    needs: [lint, changelog, audit, types, test, minimum-versions, conformance, build]
+    needs: [lint, changelog, audit, types, test, minimum-versions, comparisons, conformance, build]
     runs-on: ubuntu-latest
     steps:
       - name: Check all jobs passed

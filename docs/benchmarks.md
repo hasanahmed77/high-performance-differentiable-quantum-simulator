@@ -1,9 +1,8 @@
 # Benchmarks
 
-ketjet's benchmark suite times five kinds of work on the NumPy and JAX backends and writes the results, with a
-record of the machine, to `benchmarks/results/`. How it measures is decided in
-[ADR-0008](adr/0008-benchmark-methodology.md). Comparisons with other simulators (Sprint 7, QS-1103) and plots
-(QS-1104) build on it.
+ketjet's benchmark suite times five kinds of work on the NumPy and JAX backends and on four other simulators,
+and writes the results, with a record of the machine, to `benchmarks/results/`. How it measures is decided in
+[ADR-0008](adr/0008-benchmark-methodology.md). Plots (QS-1104) build on it.
 
 ## The benchmarks
 
@@ -27,6 +26,31 @@ Each benchmark runs on these **runners**:
 - `ketjet-jax`: the JAX backend, compiled, with JAX's own reverse mode for gradients and `jax.vmap` for batches.
 - `ketjet-jax-adjoint`: the same with `diff_method="adjoint"`, for the two gradient benchmarks.
 
+And the other simulators, on the CPU (QS-1103):
+
+| Runner | Library | Gradients | Batches | Precisions |
+|---|---|---|---|---|
+| `pennylane-default` | PennyLane's `default.qubit` | backprop, with autograd | a Python loop (see below) | complex128 |
+| `pennylane-lightning` | `lightning.qubit`, PennyLane's C++ simulator | its adjoint method | parameter broadcasting | complex128, complex64 |
+| `qiskit-aer` | Qiskit Aer's statevector simulator | none of its own: state benchmarks only | | complex128, complex64 |
+| `qulacs` | Qulacs | `ParametricQuantumCircuit.backprop` | a Python loop | complex128 |
+
+Each benchmark circuit is built once, as a ketjet circuit, and translated gate by gate into each library's own
+API (`benchmarks/libraries.py`), with the same gates and angles. Each library runs with its default options
+and all cores, and its circuit is built outside the timer. Every translation is checked against ketjet's
+oracle before it's timed, which is what found the conventions that differ:
+
+- Qiskit and Qulacs number qubits from the least significant bit, ketjet and PennyLane from the most.
+- Qulacs's rotation gates turn the opposite way to everyone else's, so its angles and gradients are negated.
+- Qiskit's default transpiler removes the QFT's final SWAPs and permutes the qubits instead, which returns a
+  different state. Aer runs every benchmark gate natively, so the circuits aren't transpiled.
+- `default.qubit`'s parameter broadcasting fails under autograd from 12 qubits, with "shape-mismatch for
+  sum" (PennyLane 0.45.1). Its QML batch is a Python loop, as ketjet's NumPy runner's and Qulacs's are.
+
+The libraries are pinned in their own dependency group, `bench`, which users and the normal test run never
+install. CI installs it in one job and checks every translation at 3 and 4 qubits, in both precisions where a
+library has them (`tests/integration/test_comparison_libraries.py`).
+
 ## How it measures
 
 Following ADR-0008:
@@ -48,7 +72,8 @@ Following ADR-0008:
 In the GPU workstation image ([GPU workstation](dev/gpu-workstation.md)), from the repository:
 
 ```bash
-uv run python -m benchmarks.run                    # everything on the CPU: about 40 minutes
+uv sync --group bench                              # the other simulators
+uv run python -m benchmarks.run                    # everything on the CPU
 uv run python -m benchmarks.run --device gpu       # the JAX runners on the GPU
 uv run python -m benchmarks.run --benchmarks qft,vqe-grad --sizes 8,12 --quick
 ```
@@ -70,6 +95,9 @@ Each run writes one JSON file, `benchmarks/results/<date>-<device>-<precision>.j
 - `settings`: the sample settings used, and whether they're the published ones.
 - `cases`: one entry per benchmark, runner and size, with the median, quartiles, minimum, first call, gate and
   parameter counts, and every process's own samples.
+
+- `failed`: any case that failed, with the end of its error: an exception, a wrong answer or running out of
+  memory. The larger sizes of the same benchmark and runner are then skipped, and the run goes on.
 
 A file without its machine record is rejected (`benchmarks.harness.validate`).
 
