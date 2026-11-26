@@ -977,10 +977,10 @@ provides-extras = ["jax", "pennylane"]
 
 [package.metadata.requires-dev]
 bench = [
-    { name = "pennylane-lightning", specifier = ">=0.45,<0.46" },
-    { name = "qiskit", specifier = ">=2.0" },
-    { name = "qiskit-aer", specifier = ">=0.18" },
-    { name = "qulacs", specifier = ">=0.6" },
+    { name = "pennylane-lightning", specifier = "==0.45.0" },
+    { name = "qiskit", specifier = "==2.6.2" },
+    { name = "qiskit-aer", specifier = "==0.18.4" },
+    { name = "qulacs", specifier = "==0.6.14" },
 ]
 conformance = [
     { name = "flaky", specifier = ">=3.8" },

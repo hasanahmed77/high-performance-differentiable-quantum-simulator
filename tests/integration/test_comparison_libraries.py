@@ -5,8 +5,6 @@ skipped. Each translated circuit is run at small sizes and checked against the N
 exactly as the harness does before it times anything (ADR-0008 D1).
 """
 
-import importlib.util
-
 import numpy as np
 import pytest
 from benchmarks import harness
@@ -17,6 +15,7 @@ from benchmarks.libraries import (
     PACKAGES,
     STATE_ONLY,
     UnsupportedGateError,
+    installed,
     pauli_terms,
     supports,
 )
@@ -33,16 +32,12 @@ pytestmark = pytest.mark.filterwarnings(
 )
 
 
-def _installed(runner: str) -> bool:
-    return importlib.util.find_spec(PACKAGES[runner]) is not None
-
-
 def _library_cases(precision: str) -> list[Case]:
     return cases(runners=LIBRARY_RUNNERS, sizes=[3, 4], precision=precision)
 
 
 def _skip_if_missing(case: Case) -> None:
-    if not _installed(case.runner):
+    if not installed(case.runner):
         pytest.skip(f"{PACKAGES[case.runner]} isn't installed: uv sync --group bench")
 
 
@@ -93,7 +88,7 @@ def test_pauli_terms() -> None:
 
 @pytest.mark.parametrize("runner", ["pennylane-default", "qiskit-aer", "qulacs"])
 def test_an_unknown_gate_is_refused_not_mistranslated(runner: str) -> None:
-    if not _installed(runner):
+    if not installed(runner):
         pytest.skip(f"{PACKAGES[runner]} isn't installed")
     from benchmarks.circuits import Spec  # noqa: PLC0415
     from benchmarks.libraries import prepare_library  # noqa: PLC0415

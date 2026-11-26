@@ -24,6 +24,7 @@ Each library is used as its documentation shows, with its default options and al
 its circuit is built outside the timer.
 """
 
+import importlib.util
 from collections.abc import Callable
 from typing import Any, Final
 
@@ -50,11 +51,21 @@ STATE_ONLY: Final = frozenset({"qiskit-aer"})
 
 PACKAGES: Final[dict[str, str]] = {
     "pennylane-default": "pennylane",
-    "pennylane-lightning": "pennylane_lightning",
+    # PennyLane installs pennylane-lightning itself, but where it has no wheel (Python 3.15) the
+    # package comes without its compiled simulator, which is what the runner needs.
+    "pennylane-lightning": "pennylane_lightning.lightning_qubit_ops",
     "qiskit-aer": "qiskit_aer",
     "qulacs": "qulacs",
 }
 """The module each runner needs."""
+
+
+def installed(runner: str) -> bool:
+    """Return whether ``runner``'s library is installed and usable."""
+    try:
+        return importlib.util.find_spec(PACKAGES[runner]) is not None
+    except ModuleNotFoundError:  # a parent package is missing
+        return False
 
 
 class UnsupportedGateError(NotImplementedError):

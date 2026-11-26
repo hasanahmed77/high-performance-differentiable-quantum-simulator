@@ -30,6 +30,7 @@ from typing import Any, Final
 from benchmarks import harness
 from benchmarks.cases import DEVICES, PRECISIONS, RUNNERS, SMOKE_SIZE, Case, cases, prepare
 from benchmarks.circuits import BENCHMARKS
+from benchmarks.libraries import LIBRARY_RUNNERS, installed
 
 ROOT: Final = Path(__file__).resolve().parent.parent
 RESULTS: Final = ROOT / "benchmarks" / "results"
@@ -133,7 +134,12 @@ def _list(text: str) -> list[str]:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m benchmarks.run", description=__doc__)
     parser.add_argument("--benchmarks", type=_list, default=list(BENCHMARKS))
-    parser.add_argument("--runners", type=_list, default=list(RUNNERS))
+    parser.add_argument(
+        "--runners",
+        type=_list,
+        default=[r for r in RUNNERS if r not in LIBRARY_RUNNERS or installed(r)],
+        help="default: ketjet's, and every other library that's installed (uv sync --group bench)",
+    )
     parser.add_argument(
         "--sizes",
         type=lambda s: [int(n) for n in _list(s)],
