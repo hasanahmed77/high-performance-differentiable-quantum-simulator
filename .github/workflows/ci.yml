@@ -143,8 +143,9 @@ jobs:
   comparisons:
     name: Comparison libraries agree with the oracle
     # The other simulators' translations of every benchmark circuit (QS-1103), checked against
-    # ketjet's NumPy oracle at small sizes, so a translation can't drift unnoticed. The bench group
-    # is installed only here.
+    # ketjet's NumPy oracle at small sizes, so a translation can't drift unnoticed; and the docs'
+    # figures, checked against the committed results (QS-1104). The bench group is installed only
+    # here.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -153,7 +154,9 @@ jobs:
           enable-cache: true
           python-version: "3.13"
       - run: uv sync --group bench
-      - run: uv run --no-sync pytest -p no:cacheprovider tests/integration/test_comparison_libraries.py -rs
+      - run: >-
+          uv run --no-sync pytest -p no:cacheprovider -rs
+          tests/integration/test_comparison_libraries.py tests/integration/test_benchmark_plots.py
 
   conformance:
     name: PennyLane device suite (pl-device-test)

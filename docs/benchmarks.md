@@ -2,7 +2,8 @@
 
 ketjet's benchmark suite times five kinds of work on the NumPy and JAX backends and on four other simulators,
 and writes the results, with a record of the machine, to `benchmarks/results/`. How it measures is decided in
-[ADR-0008](adr/0008-benchmark-methodology.md). Plots (QS-1104) build on it.
+[ADR-0008](adr/0008-benchmark-methodology.md), and every figure on this page is drawn from the committed
+results by one command.
 
 ## The benchmarks
 
@@ -77,6 +78,7 @@ uv run python -m benchmarks.run                    # everything on the CPU
 uv run python -m benchmarks.run --device gpu       # the JAX runners on the GPU
 uv run python -m benchmarks.run --benchmarks qft,vqe-grad --sizes 8,12 --quick
 uv run python -m benchmarks.compare benchmarks/results/<file>.json   # ketjet against the others
+uv run python -m benchmarks.plots                  # redraws every figure from the JSON
 ```
 
 `--quick` (one process, five samples) and `--smoke` (one call, 3 qubits) are for development. They are written as
@@ -102,6 +104,24 @@ Each run writes one JSON file, `benchmarks/results/<date>-<device>-<precision>.j
 
 A file without its machine record is rejected (`benchmarks.harness.validate`).
 
+## The figures
+
+`uv run python -m benchmarks.plots` draws four figures for each published result file, into
+`docs/assets/benchmarks/`, named after the file. A figure never mixes two files, so numbers from two machines or
+two runs are never drawn together (ADR-0008 D6).
+
+- `-time`: the steady-state median against qubits for every benchmark and runner, with the interquartile range,
+  on log axes.
+- `-speedup`: each library's time divided by ketjet's fastest runner's at the same size; above 1, ketjet is
+  faster. The grey band is "no clear difference", 0.9 to 1.1.
+- `-gradients`: the time of one gradient against qubits, by method: ketjet's adjoint (NumPy and JAX) and
+  backprop (JAX), and each library's own.
+- `-first-call`: the first call divided by the steady state. For JAX the first call includes compilation.
+
+ketjet's lines are solid and the other libraries' dashed, and every runner has its own colour and marker. The
+SVGs are deterministic, and CI checks that the committed figures are what the committed results draw
+(`tests/integration/test_benchmark_plots.py`), so a figure can't go stale.
+
 ## First results (2026-11-24)
 
 On the GPU workstation: an Intel Core i5-9600K (6 cores), 6 GB for the container, an RTX 4060 (8 GB, driver
@@ -118,6 +138,10 @@ are in `benchmarks/results/2026-11-24-cpu-complex128.json` and `2026-11-24-gpu-c
 | `random` | 20 | 1,842 | 862 | | 661 | |
 | `vqe-grad` | 20 | 7,091 | 2,649 | 3,598 | 1,068 | 1,891 |
 | `qml-batch` | 16 | 4,849 | 2,258 | 3,188 | 511 | 591 |
+
+![Steady-state time against qubits, 2026-11-24, CPU](assets/benchmarks/2026-11-24-cpu-complex128-time.svg)
+
+![Steady-state time against qubits, 2026-11-24, GPU](assets/benchmarks/2026-11-24-gpu-complex128-time.svg)
 
 What they show:
 
@@ -153,6 +177,14 @@ largest size. The full numbers are in `benchmarks/results/2026-11-26-cpu-complex
 | `random` | 20 | 934 | 1,731: ketjet **1.9x faster** | 268: ketjet 3.5x slower | 122: ketjet 7.7x slower | 228: ketjet 4.1x slower |
 | `vqe-grad` | 20 | 2,841 | 11,746: ketjet **4.1x faster** | 2,002: ketjet 1.4x slower | no gradients | 1,927: ketjet 1.5x slower |
 | `qml-batch` | 16 | 2,447 | 6,113: ketjet **2.5x faster** | 398: ketjet 6.1x slower | no gradients | 485: ketjet 5.0x slower |
+
+![Each library's time over ketjet's, 2026-11-26, CPU, complex128](assets/benchmarks/2026-11-26-cpu-complex128-speedup.svg)
+
+![Steady-state time against qubits, 2026-11-26, CPU, complex128](assets/benchmarks/2026-11-26-cpu-complex128-time.svg)
+
+![Gradient time by method, 2026-11-26, CPU, complex128](assets/benchmarks/2026-11-26-cpu-complex128-gradients.svg)
+
+![First call over steady state, 2026-11-26, CPU, complex128](assets/benchmarks/2026-11-26-cpu-complex128-first-call.svg)
 
 What it shows:
 

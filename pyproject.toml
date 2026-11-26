@@ -76,12 +76,14 @@ docs = [
     "mkdocstrings[python]>=0.30",
 ]
 bench = [
-    # The other simulators ketjet is compared with (QS-1103). Pinned exactly, so a rerun installs
-    # the same versions (ADR-0008 D5). Never needed by users or the normal test run.
+    # The other simulators ketjet is compared with (QS-1103) and the figures (QS-1104). Pinned
+    # exactly, so a rerun installs the same versions (ADR-0008 D5). Never needed by users or the
+    # normal test run.
     "pennylane-lightning==0.45.0",
     "qiskit==2.6.2",
     "qiskit-aer==0.18.4",
     "qulacs==0.6.14",
+    "matplotlib==3.11.2",
 ]
 gpu = [
     # The GPU workstation image (environment/gpu.Dockerfile, QS-112). The CUDA 12 runtime comes as
