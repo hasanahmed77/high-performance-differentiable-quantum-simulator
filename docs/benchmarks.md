@@ -60,6 +60,32 @@ uv run python -m benchmarks.run --benchmarks qft,vqe-grad --sizes 8,12 --quick
 While a run is going, the machine should be plugged in and otherwise idle: no games, video or other heavy programs
 (ADR-0008 D6).
 
+## GPU capacity (2026-11-26)
+
+How many qubits the JAX backend fits on the RTX 4060 (8 GB), measured with
+`uv run python -m benchmarks.capacity --device gpu` (QS-1108). Each size runs in its own process, growing until
+one runs out of memory; the full record, with the peak memory of every size, is in
+`benchmarks/capacity/2026-11-26-gpu.json`.
+
+| Workload | complex64 | complex128 | Peak memory, in copies of the state |
+|---|---|---|---|
+| The `random` circuit's final state | 25 qubits | 24 qubits | 8 to 9 |
+| The `vqe-grad` gradient, adjoint | 25 qubits | 24 qubits | 4 to 5 |
+| The `vqe-grad` gradient, backprop | 21 qubits | 20 qubits | about 170, and growing with depth |
+
+What it shows:
+
+- **The forward pass uses 8 to 9 states of memory,** where in-place kernels would need one or two. At 26 qubits
+  in complex64 a 512 MB state asked for a 4 GB buffer. XLA keeps intermediate copies between gates; this is the
+  same overhead that keeps the GPU far from its memory bandwidth (above), and it's the CUDA backend's job to
+  remove (Sprints 12–13). plan.md §4.5 planned 29 and 28 qubits; it now lists these measured numbers too.
+- **Adjoint fits as many qubits as the forward pass,** using about half its memory at the largest sizes.
+- **Backprop is limited by depth:** it keeps every intermediate state, so at 4 layers it fits 4 qubits fewer than
+  adjoint, and a deeper circuit fits fewer still. Adjoint is the method for large circuits (ADR-0007).
+- **complex128 is slow on this GPU:** the RTX 4060, like other consumer cards, runs double precision at a small
+  fraction of its single-precision rate. The adjoint gradient at 24 qubits took 37 s in complex128 against 2.8 s
+  in complex64.
+
 ## The result files
 
 Each run writes one JSON file, `benchmarks/results/<date>-<device>-<precision>.json`. It holds:

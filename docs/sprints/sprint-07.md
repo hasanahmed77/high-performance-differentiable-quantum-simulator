@@ -16,7 +16,7 @@
 | QS-1104 | Plots regenerated from the JSON by one command: time against qubits, speedup, gradient cost | 3 | QS-1102 | |
 | QS-1105 | Nightly asv regression tracking, a published dashboard, and an issue opened on a regression over 10% | 3 | n/a | |
 | QS-407 | VQE H₂ example converges to the known energy (re-estimated from 2, see below) | 0 | n/a | |
-| QS-1108 | **New, stretch:** how many qubits the JAX backend fits on the RTX 4060, for each gradient method and precision | 2 | QS-1102 | |
+| QS-1108 | **New, stretch:** how many qubits the JAX backend fits on the RTX 4060, for each gradient method and precision | 2 | QS-1102 | this PR |
 | | **Total** | **18** (16 committed + 2 stretch) | | |
 
 **Capacity.** Mean throughput over seven sprints is 20.9 points. The 16 committed points leave room for running the

@@ -1,0 +1,540 @@
+{
+ "format": "ketjet-capacity",
+ "version": 1,
+ "machine": {
+  "date": "2026-11-26T10:03:36+00:00",
+  "hardware": {
+   "cpu": "Intel(R) Core(TM) i5-9600K CPU @ 3.70GHz",
+   "cores": 6,
+   "threads": 6,
+   "memory_bytes": 8288047104,
+   "gpus": [
+    {
+     "name": "NVIDIA GeForce RTX 4060",
+     "memory": "8188 MiB",
+     "driver": "610.88"
+    }
+   ]
+  },
+  "software": {
+   "os": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+   "kernel": "6.18.58.1-microsoft-standard-WSL2",
+   "wsl": "WSL2",
+   "python": "3.13.18",
+   "ketjet": "0.2.0",
+   "git_commit": "3b1ddb45de400d2f3f0429298852a140c8e53fe9",
+   "git_clean": null,
+   "container_image": "sha256:be6aa75a52651eac15332e9638cd4fe8e8fe30ef865f7d75f05ef9f8561f6b84",
+   "libraries": {
+    "ketjet": "0.2.0",
+    "numpy": "2.5.5",
+    "jax": "0.12.0.1",
+    "jaxlib": "0.12.0.1",
+    "jax-cuda12-plugin": "0.12.0.1",
+    "jax-cuda12-pjrt": "0.12.0.1",
+    "nvidia-cuda-runtime-cu12": "12.9.79",
+    "pennylane": "0.45.1",
+    "pennylane-lightning": "0.45.0"
+   }
+  },
+  "settings": {
+   "environment": {
+    "XLA_PYTHON_CLIENT_PREALLOCATE": "false"
+   },
+   "memory_cap": "6442450944"
+  }
+ },
+ "device": "gpu",
+ "results": [
+  {
+   "workload": "state",
+   "precision": "complex64",
+   "largest": 25,
+   "attempts": [
+    {
+     "workload": "state",
+     "precision": "complex64",
+     "n_qubits": 18,
+     "ok": true,
+     "first_call_s": 6.201584546000049,
+     "call_s": 0.009721979999994801,
+     "peak_bytes": 18875136,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "state",
+     "precision": "complex64",
+     "n_qubits": 19,
+     "ok": true,
+     "first_call_s": 6.389449281999987,
+     "call_s": 0.02024328799984687,
+     "peak_bytes": 37749504,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "state",
+     "precision": "complex64",
+     "n_qubits": 20,
+     "ok": true,
+     "first_call_s": 6.405800451999994,
+     "call_s": 0.04069290799998271,
+     "peak_bytes": 75498240,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "state",
+     "precision": "complex64",
+     "n_qubits": 21,
+     "ok": true,
+     "first_call_s": 8.667767308000066,
+     "call_s": 0.07967514200004189,
+     "peak_bytes": 150995712,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "state",
+     "precision": "complex64",
+     "n_qubits": 22,
+     "ok": true,
+     "first_call_s": 8.407074449999982,
+     "call_s": 0.1766235659999893,
+     "peak_bytes": 301990656,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "state",
+     "precision": "complex64",
+     "n_qubits": 23,
+     "ok": true,
+     "first_call_s": 12.442195567999988,
+     "call_s": 0.32348134400012896,
+     "peak_bytes": 603980544,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "state",
+     "precision": "complex64",
+     "n_qubits": 24,
+     "ok": true,
+     "first_call_s": 11.325795169999992,
+     "call_s": 0.7427274100000432,
+     "peak_bytes": 1207960320,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "state",
+     "precision": "complex64",
+     "n_qubits": 25,
+     "ok": true,
+     "first_call_s": 12.996378227999912,
+     "call_s": 1.5582465879999745,
+     "peak_bytes": 2151738624,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "state",
+     "precision": "complex64",
+     "n_qubits": 26,
+     "ok": false,
+     "out_of_memory": true,
+     "exit_code": 1,
+     "error": [
+      "    call: Any = lambda: run(x).block_until_ready()  # noqa: E731",
+      "                        ~~~~~~~~~~~~~~~~~~~~~~~~^^",
+      "jax.errors.JaxRuntimeError: RESOURCE_EXHAUSTED: Out of memory while trying to allocate 4.00GiB with allocator GPU_0_bfc on device 0. [tf-allocator-allocation-error=''] [executable_name='jit_run']"
+     ]
+    }
+   ]
+  },
+  {
+   "workload": "adjoint",
+   "precision": "complex64",
+   "largest": 25,
+   "attempts": [
+    {
+     "workload": "adjoint",
+     "precision": "complex64",
+     "n_qubits": 18,
+     "ok": true,
+     "first_call_s": 20.303740041000083,
+     "call_s": 0.030660698999781744,
+     "peak_bytes": 109052928,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "adjoint",
+     "precision": "complex64",
+     "n_qubits": 19,
+     "ok": true,
+     "first_call_s": 20.418511801000022,
+     "call_s": 0.06112449799979913,
+     "peak_bytes": 134218496,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "adjoint",
+     "precision": "complex64",
+     "n_qubits": 20,
+     "ok": true,
+     "first_call_s": 20.99620617200003,
+     "call_s": 0.13009375299998283,
+     "peak_bytes": 134218496,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "adjoint",
+     "precision": "complex64",
+     "n_qubits": 21,
+     "ok": true,
+     "first_call_s": 23.785976190999918,
+     "call_s": 0.29022260800002186,
+     "peak_bytes": 155190272,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "adjoint",
+     "precision": "complex64",
+     "n_qubits": 22,
+     "ok": true,
+     "first_call_s": 26.03703112900007,
+     "call_s": 0.6331945590000032,
+     "peak_bytes": 268436992,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "adjoint",
+     "precision": "complex64",
+     "n_qubits": 23,
+     "ok": true,
+     "first_call_s": 27.634723355000006,
+     "call_s": 1.32631937799988,
+     "peak_bytes": 339739648,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "adjoint",
+     "precision": "complex64",
+     "n_qubits": 24,
+     "ok": true,
+     "first_call_s": 30.271070525999903,
+     "call_s": 2.7679262210001525,
+     "peak_bytes": 608175104,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "adjoint",
+     "precision": "complex64",
+     "n_qubits": 25,
+     "ok": true,
+     "first_call_s": 34.126524346999986,
+     "call_s": 5.760288026999888,
+     "peak_bytes": 1074035968,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "adjoint",
+     "precision": "complex64",
+     "n_qubits": 26,
+     "ok": false,
+     "out_of_memory": true,
+     "exit_code": 1,
+     "error": [
+      "    call = lambda: grad(weights).block_until_ready()  # noqa: E731",
+      "                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^",
+      "jax.errors.JaxRuntimeError: RESOURCE_EXHAUSTED: Out of memory while trying to allocate 2.00GiB with allocator GPU_0_bfc on device 0. [executable_name='jit__lambda'] [tf-allocator-allocation-error='']"
+     ]
+    }
+   ]
+  },
+  {
+   "workload": "backprop",
+   "precision": "complex64",
+   "largest": 21,
+   "attempts": [
+    {
+     "workload": "backprop",
+     "precision": "complex64",
+     "n_qubits": 18,
+     "ok": true,
+     "first_call_s": 17.96562126499998,
+     "call_s": 0.02890541800002211,
+     "peak_bytes": 325245696,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "backprop",
+     "precision": "complex64",
+     "n_qubits": 19,
+     "ok": true,
+     "first_call_s": 20.14970074200005,
+     "call_s": 0.05932238300010795,
+     "peak_bytes": 681771776,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "backprop",
+     "precision": "complex64",
+     "n_qubits": 20,
+     "ok": true,
+     "first_call_s": 21.200360701000136,
+     "call_s": 0.11672119500008193,
+     "peak_bytes": 1430465024,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "backprop",
+     "precision": "complex64",
+     "n_qubits": 21,
+     "ok": true,
+     "first_call_s": 22.493637392999972,
+     "call_s": 0.23489667999979247,
+     "peak_bytes": 3003339264,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "backprop",
+     "precision": "complex64",
+     "n_qubits": 22,
+     "ok": false,
+     "out_of_memory": true,
+     "exit_code": 1,
+     "error": [
+      "    call = lambda: grad(weights).block_until_ready()  # noqa: E731",
+      "                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^",
+      "jax.errors.JaxRuntimeError: RESOURCE_EXHAUSTED: Out of memory while trying to allocate 5.73GiB with allocator GPU_0_bfc on device 0. [tf-allocator-allocation-error=''] [executable_name='jit__lambda']"
+     ]
+    }
+   ]
+  },
+  {
+   "workload": "state",
+   "precision": "complex128",
+   "largest": 24,
+   "attempts": [
+    {
+     "workload": "state",
+     "precision": "complex128",
+     "n_qubits": 18,
+     "ok": true,
+     "first_call_s": 9.107797769999934,
+     "call_s": 0.16025794500001211,
+     "peak_bytes": 134219008,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "state",
+     "precision": "complex128",
+     "n_qubits": 19,
+     "ok": true,
+     "first_call_s": 8.613359930000115,
+     "call_s": 0.31812395299994023,
+     "peak_bytes": 134219008,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "state",
+     "precision": "complex128",
+     "n_qubits": 20,
+     "ok": true,
+     "first_call_s": 9.32261835600002,
+     "call_s": 0.7392218469999534,
+     "peak_bytes": 155190784,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "state",
+     "precision": "complex128",
+     "n_qubits": 21,
+     "ok": true,
+     "first_call_s": 10.803231039000138,
+     "call_s": 1.3729583059998731,
+     "peak_bytes": 301991424,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "state",
+     "precision": "complex128",
+     "n_qubits": 22,
+     "ok": true,
+     "first_call_s": 14.410167270000102,
+     "call_s": 3.121505864000028,
+     "peak_bytes": 603981312,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "state",
+     "precision": "complex128",
+     "n_qubits": 23,
+     "ok": true,
+     "first_call_s": 17.7174085380002,
+     "call_s": 5.172799149000184,
+     "peak_bytes": 1010889216,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "state",
+     "precision": "complex128",
+     "n_qubits": 24,
+     "ok": true,
+     "first_call_s": 24.504982780999853,
+     "call_s": 11.747749654000017,
+     "peak_bytes": 2151738880,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "state",
+     "precision": "complex128",
+     "n_qubits": 25,
+     "ok": false,
+     "out_of_memory": true,
+     "exit_code": 1,
+     "error": [
+      "    call: Any = lambda: run(x).block_until_ready()  # noqa: E731",
+      "                        ~~~~~~~~~~~~~~~~~~~~~~~~^^",
+      "jax.errors.JaxRuntimeError: RESOURCE_EXHAUSTED: Out of memory while trying to allocate 3.50GiB with allocator GPU_0_bfc on device 0. [tf-allocator-allocation-error=''] [executable_name='jit_run']"
+     ]
+    }
+   ]
+  },
+  {
+   "workload": "adjoint",
+   "precision": "complex128",
+   "largest": 24,
+   "attempts": [
+    {
+     "workload": "adjoint",
+     "precision": "complex128",
+     "n_qubits": 18,
+     "ok": true,
+     "first_call_s": 13.932520358000147,
+     "call_s": 0.45990494500028944,
+     "peak_bytes": 134219008,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "adjoint",
+     "precision": "complex128",
+     "n_qubits": 19,
+     "ok": true,
+     "first_call_s": 15.561475266999878,
+     "call_s": 0.9574917949998962,
+     "peak_bytes": 134219008,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "adjoint",
+     "precision": "complex128",
+     "n_qubits": 20,
+     "ok": true,
+     "first_call_s": 18.09371879199989,
+     "call_s": 2.0517739480001183,
+     "peak_bytes": 155190784,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "adjoint",
+     "precision": "complex128",
+     "n_qubits": 21,
+     "ok": true,
+     "first_call_s": 21.09681103799994,
+     "call_s": 4.3833304009999665,
+     "peak_bytes": 268438528,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "adjoint",
+     "precision": "complex128",
+     "n_qubits": 22,
+     "ok": true,
+     "first_call_s": 27.530204150999907,
+     "call_s": 9.137753400999827,
+     "peak_bytes": 339740416,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "adjoint",
+     "precision": "complex128",
+     "n_qubits": 23,
+     "ok": true,
+     "first_call_s": 38.44401643099991,
+     "call_s": 18.049708184999872,
+     "peak_bytes": 608175872,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "adjoint",
+     "precision": "complex128",
+     "n_qubits": 24,
+     "ok": true,
+     "first_call_s": 59.90168654700028,
+     "call_s": 36.74715143900039,
+     "peak_bytes": 1074132224,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "adjoint",
+     "precision": "complex128",
+     "n_qubits": 25,
+     "ok": false,
+     "out_of_memory": true,
+     "exit_code": 1,
+     "error": [
+      "    call = lambda: grad(weights).block_until_ready()  # noqa: E731",
+      "                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^",
+      "jax.errors.JaxRuntimeError: RESOURCE_EXHAUSTED: Out of memory while trying to allocate 2.00GiB with allocator GPU_0_bfc on device 0. [executable_name='jit__lambda'] [tf-allocator-allocation-error='']"
+     ]
+    }
+   ]
+  },
+  {
+   "workload": "backprop",
+   "precision": "complex128",
+   "largest": 20,
+   "attempts": [
+    {
+     "workload": "backprop",
+     "precision": "complex128",
+     "n_qubits": 18,
+     "ok": true,
+     "first_call_s": 16.308862758000032,
+     "call_s": 0.2700019659996542,
+     "peak_bytes": 648245760,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "backprop",
+     "precision": "complex128",
+     "n_qubits": 19,
+     "ok": true,
+     "first_call_s": 17.13437468100028,
+     "call_s": 0.5508445909999864,
+     "peak_bytes": 1363391488,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "backprop",
+     "precision": "complex128",
+     "n_qubits": 20,
+     "ok": true,
+     "first_call_s": 18.633788836999884,
+     "call_s": 1.1645051629998306,
+     "peak_bytes": 2864929792,
+     "device": "cuda:0"
+    },
+    {
+     "workload": "backprop",
+     "precision": "complex128",
+     "n_qubits": 21,
+     "ok": false,
+     "out_of_memory": true,
+     "exit_code": 1,
+     "error": [
+      "    call = lambda: grad(weights).block_until_ready()  # noqa: E731",
+      "                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^",
+      "jax.errors.JaxRuntimeError: RESOURCE_EXHAUSTED: Out of memory while trying to allocate 5.60GiB with allocator GPU_0_bfc on device 0. [tf-allocator-allocation-error=''] [executable_name='jit__lambda']"
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -241,12 +241,17 @@ the workflow, rather than by built-in project automations:
 a full Linux CUDA stack on the Windows workstation without dual-booting. Native Windows remains a
 supported *target platform* (CPU wheels), tested in hosted CI.
 
-**Single-GPU capacity (RTX 4060, 8 GB):**
+**Single-GPU capacity (RTX 4060, 8 GB).** The planned limits assume kernels that update the state in place.
+The JAX backend's were measured in QS-1108 (2026-11-26, `benchmarks/capacity/2026-11-26-gpu.json`), and are
+lower, because XLA keeps several copies of the state:
 
-| Workload | complex64 | complex128 |
-|---|---|---|
-| Statevector simulation | ≤29 qubits | ≤28 qubits |
-| Adjoint differentiation (~3 state copies) | ≤27 qubits | ≤26 qubits |
+| Workload | Planned, complex64 | Planned, complex128 | Measured, JAX backend, complex64 | Measured, JAX backend, complex128 | Peak memory, in states |
+|---|---|---|---|---|---|
+| Statevector simulation | ≤29 qubits | ≤28 qubits | **≤25 qubits** | **≤24 qubits** | 8–9 |
+| Adjoint differentiation | ≤27 qubits (~3 state copies) | ≤26 qubits | **≤25 qubits** | **≤24 qubits** | 4–5 |
+| Backprop (the `vqe-grad` ansatz, 4 layers) | n/a | n/a | **≤21 qubits** | **≤20 qubits** | ~170, growing with depth |
+
+G5's 29 qubits on this GPU is therefore the CUDA backend's job (Sprints 12–13), not the JAX backend's.
 
 **Free-tier capacity (T4, 16 GB):** ≤30 qubits complex64 on one T4; ≤31 qubits complex64 sharded across Kaggle's 2× T4.
 
