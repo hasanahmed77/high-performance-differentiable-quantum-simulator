@@ -1,0 +1,142 @@
+name: Nightly benchmarks
+
+# ketjet's regression tracking (QS-1105, ADR-0008 D7). asv compares tonight's main with the last
+# nightly run's commit, in one job, so the hosted runner's own speed cancels out. A slowdown over
+# 10% is rerun once; if it's still there, an issue is opened. The results history and the asv
+# dashboard are kept on the `asv-results` branch, and the docs site publishes the dashboard under
+# /benchmarks/dashboard/. Runs on the CPU only: GPU benchmarks are run by hand (ADR-0007 D5).
+#
+# To measure the runner's noise, dispatch with `base` set to a commit whose src/ is the same as
+# the dispatched commit's: any difference reported is then noise.
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      base:
+        description: "Commit to compare against (default: the last nightly run's, or HEAD~1)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-benchmarks
+  cancel-in-progress: false
+
+env:
+  UV_FROZEN: "1"
+  FACTOR: "1.1"  # ADR-0008 D7: 10% until the runners are shown to be quiet enough for 5%
+  MACHINE: github-actions
+
+jobs:
+  regressions:
+    name: asv continuous
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: write  # the results history on the asv-results branch
+      issues: write  # a perf-regression issue
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+          python-version: "3.13"
+      - run: uv sync --group bench
+
+      - name: Restore the results history
+        run: |
+          # A worktree of the asv-results branch, or a new orphan branch on the first run, so that
+          # the push below uses the checkout's credentials.
+          if git fetch origin asv-results:asv-results; then
+            git worktree add history asv-results
+          else
+            git worktree add --orphan -b asv-results history
+          fi
+          mkdir -p .asv
+          if [ -d history/results ]; then cp -r history/results .asv/results; fi
+
+      - name: Choose the commits
+        id: commits
+        env:
+          BASE_INPUT: ${{ inputs.base }}
+        run: |
+          base="$BASE_INPUT"
+          if [ -z "$base" ] && [ -f history/last-commit ]; then base="$(cat history/last-commit)"; fi
+          if [ -z "$base" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then base="$(git rev-parse HEAD~1)"; fi
+          echo "base=$(git rev-parse "$base")" >> "$GITHUB_OUTPUT"
+          echo "head=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Compare
+        id: compare
+        env:
+          BASE: ${{ steps.commits.outputs.base }}
+          HEAD_SHA: ${{ steps.commits.outputs.head }}
+        run: |
+          uv run --no-sync asv machine --yes --machine "$MACHINE"
+          if [ "$BASE" = "$HEAD_SHA" ]; then
+            echo "Nothing new since $BASE."
+            echo "regressed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          regressed=false
+          # asv continuous exits with 1 when a benchmark slowed by more than FACTOR. ADR-0008 D7:
+          # a regression is rerun once before it counts.
+          for attempt in 1 2; do
+            if uv run --no-sync asv continuous --factor "$FACTOR" --split --show-stderr \
+                --machine "$MACHINE" "$BASE" "$HEAD_SHA"; then
+              regressed=false
+              break
+            else
+              status=$?
+              if [ "$status" -ne 1 ]; then exit "$status"; fi
+              regressed=true
+              echo "Attempt $attempt: a regression over $FACTOR."
+            fi
+          done
+          echo "regressed=$regressed" >> "$GITHUB_OUTPUT"
+          uv run --no-sync asv compare --factor "$FACTOR" --split --machine "$MACHINE" \
+            "$BASE" "$HEAD_SHA" > comparison.txt
+
+      - name: Open an issue for a regression
+        if: steps.compare.outputs.regressed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: ${{ steps.commits.outputs.base }}
+          HEAD_SHA: ${{ steps.commits.outputs.head }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh label create perf-regression --color D93F0B \
+            --description "A nightly benchmark slowed by more than ADR-0008 D7's threshold" --force
+          {
+            echo "The nightly asv run found a slowdown of more than ${FACTOR}x, twice, between"
+            echo "\`${BASE:0:7}\` and \`${HEAD_SHA:0:7}\` (ADR-0008 D7). Run: $RUN_URL"
+            echo
+            echo '```'
+            cat comparison.txt
+            echo '```'
+          } > issue.md
+          gh issue create --title "perf: nightly benchmarks slowed between ${BASE:0:7} and ${HEAD_SHA:0:7}" \
+            --label perf-regression --body-file issue.md
+
+      - name: Publish the results history and dashboard
+        if: github.ref == 'refs/heads/main'
+        env:
+          HEAD_SHA: ${{ steps.commits.outputs.head }}
+        run: |
+          uv run --no-sync asv publish
+          cd history
+          rm -rf results html
+          cp -r ../.asv/results results
+          cp -r ../.asv/html html
+          echo "$HEAD_SHA" > last-commit
+          git add -A
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "asv results for ${HEAD_SHA:0:7}" || exit 0
+          git push origin asv-results

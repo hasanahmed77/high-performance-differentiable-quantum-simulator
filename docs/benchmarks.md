@@ -104,6 +104,25 @@ Each run writes one JSON file, `benchmarks/results/<date>-<device>-<precision>.j
 
 A file without its machine record is rejected (`benchmarks.harness.validate`).
 
+## Nightly regression tracking
+
+ketjet's own speed is tracked every night with [asv](https://asv.readthedocs.io/), on GitHub's hosted runners
+(`.github/workflows/nightly-benchmarks.yml`, ADR-0008 D7). The asv benchmarks, in `asv_benchmarks/`, are a
+small set on the CPU: a random circuit's state and the VQE gradient, on NumPy and compiled JAX, at 12 and 16
+qubits.
+
+- **Commits are compared within one job,** with `asv continuous`: tonight's `main` against the last night's
+  commit. The runner's own speed cancels out.
+- **A slowdown of more than 10% is rerun once,** and if it's still there, an issue labelled `perf-regression`
+  is opened with asv's comparison. The threshold drops to 5% if the runners turn out quiet enough (ADR-0008 D7).
+- **The dashboard** is on this site at [/benchmarks/dashboard/](dashboard/), once the first
+  nightly run has published it. Its history comes from hosted runners, whose machines vary from night to night,
+  so a step in its lines isn't a regression by itself: regressions are judged within one job.
+- **Every pull request** runs each asv benchmark once, so a broken one fails CI and not the nightly run.
+
+To compare two commits by hand, or to measure the runners' noise, dispatch the workflow with a `base` commit.
+Against a commit whose `src/` is the same, every difference it reports is noise.
+
 ## The figures
 
 `uv run python -m benchmarks.plots` draws four figures for each published result file, into

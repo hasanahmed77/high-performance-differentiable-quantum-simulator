@@ -141,7 +141,7 @@ jobs:
       - run: uv run --no-sync pytest -p no:cacheprovider
 
   comparisons:
-    name: Comparison libraries agree with the oracle
+    name: Comparison libraries, figures and asv
     # The other simulators' translations of every benchmark circuit (QS-1103), checked against
     # ketjet's NumPy oracle at small sizes, so a translation can't drift unnoticed; and the docs'
     # figures, checked against the committed results (QS-1104). The bench group is installed only
@@ -157,6 +157,12 @@ jobs:
       - run: >-
           uv run --no-sync pytest -p no:cacheprovider -rs
           tests/integration/test_comparison_libraries.py tests/integration/test_benchmark_plots.py
+      - name: asv benchmarks run once (QS-1105)
+        # Every nightly benchmark runs once against this checkout, so a broken one fails here, not
+        # at night. asv exits with 2 if a benchmark fails.
+        run: |
+          uv run --no-sync asv machine --yes --machine ci
+          uv run --no-sync asv run --python=same --quick --show-stderr --machine ci
 
   conformance:
     name: PennyLane device suite (pl-device-test)

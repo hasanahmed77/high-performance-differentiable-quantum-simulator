@@ -5,6 +5,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # The nightly benchmarks update the asv dashboard (QS-1105); republish the site with it.
+  workflow_run:
+    workflows: [Nightly benchmarks]
+    types: [completed]
+    branches: [main]
 
 permissions:
   contents: read
@@ -29,14 +34,22 @@ jobs:
       - run: uv sync --group docs
       - name: Build site (warnings are errors)
         run: uv run mkdocs build --strict
-      - if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Add the asv dashboard (QS-1105)
+        run: |
+          # The nightly benchmarks keep their dashboard on the asv-results branch; before the first
+          # nightly run there's none, and the site goes out without it.
+          if git fetch --depth=1 origin asv-results 2>/dev/null; then
+            mkdir -p site/benchmarks/dashboard
+            git archive FETCH_HEAD html | tar -x --strip-components=1 -C site/benchmarks/dashboard
+          fi
+      - if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: site/
 
   deploy:
     name: Deploy to GitHub Pages
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     permissions:

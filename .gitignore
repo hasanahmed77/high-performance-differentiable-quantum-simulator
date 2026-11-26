@@ -26,3 +26,6 @@ site/
 
 # Benchmarks: quick and smoke runs are never published (ADR-0008)
 benchmarks/results/unpublished-*.json
+
+# asv (QS-1105)
+.asv/
